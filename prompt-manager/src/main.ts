@@ -17,6 +17,7 @@ import {
 import App from './App.vue'
 import router from './router'
 import { themeOverrides } from './config/theme'
+import clickOutside from './directives/clickOutside'
 
 // 创建 naive ui 实例
 const naive = create({
@@ -34,6 +35,9 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(naive)
+
+// 注册全局指令
+app.directive('click-outside', clickOutside)
 
 // 全局配置主题
 app.provide('themeOverrides', themeOverrides)

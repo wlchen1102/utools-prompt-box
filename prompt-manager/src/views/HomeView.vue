@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import type { Prompt } from '@/types/Prompt'
-import type { Tag } from '@/types/Tag'
+import type { Tag, CreateTagDTO, UpdateTagDTO } from '@/types/Tag'
+import { TAG_COLOR_CONFIGS } from '@/types/Tag'
+import TagPanel from '@/components/TagPanel.vue'
+import TagDialog from '@/components/TagDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 // 响应式数据
 const searchKeyword = ref('')
@@ -9,8 +13,26 @@ const selectedTag = ref<Tag | null>(null)
 const prompts = ref<Prompt[]>([])
 const tags = ref<Tag[]>([])
 
+// 对话框状态
+const tagDialogVisible = ref(false)
+const tagDialogMode = ref<'create' | 'edit'>('create')
+const editingTag = ref<Tag | null>(null)
+const confirmDialogVisible = ref(false)
+const deletingTag = ref<Tag | null>(null)
+
+// TagPanel组件引用
+const tagPanelRef = ref()
+
 // 计算属性
 const promptCount = computed(() => prompts.value.length)
+
+const tagPromptCounts = computed(() => {
+  const counts: Record<string, number> = {}
+  tags.value.forEach(tag => {
+    counts[tag.id] = getTagPromptCount(tag.id)
+  })
+  return counts
+})
 
 const filteredPrompts = computed(() => {
   let filtered = prompts.value
@@ -35,7 +57,7 @@ const filteredPrompts = computed(() => {
 })
 
 // 方法
-const selectTag = (tag: Tag | null) => {
+const handleTagSelect = (tag: Tag | null) => {
   selectedTag.value = tag
 }
 
@@ -50,7 +72,8 @@ const getTagName = (tagId: string) => {
 
 const getTagColor = (tagId: string) => {
   const tag = tags.value.find(t => t.id === tagId)
-  return tag?.color || '#00B25A'
+  const colorConfig = TAG_COLOR_CONFIGS[tag?.color as keyof typeof TAG_COLOR_CONFIGS] || TAG_COLOR_CONFIGS.default
+  return colorConfig.hex
 }
 
 const getContentPreview = (content: string) => {
@@ -62,8 +85,95 @@ const addPrompt = () => {
   console.log('添加提示词')
 }
 
-const addTag = () => {
-  console.log('添加标签')
+const handleTagAdd = () => {
+  tagDialogMode.value = 'create'
+  editingTag.value = null
+  tagDialogVisible.value = true
+}
+
+const handleTagEdit = (tag: Tag) => {
+  tagDialogMode.value = 'edit'
+  editingTag.value = tag
+  tagDialogVisible.value = true
+}
+
+const handleTagDelete = (tag: Tag) => {
+  deletingTag.value = tag
+  confirmDialogVisible.value = true
+}
+
+const handleTagDialogConfirm = async (data: CreateTagDTO | UpdateTagDTO) => {
+  try {
+    if (tagDialogMode.value === 'create') {
+      // 创建新标签
+      const newTag: Tag = {
+        id: Date.now().toString(),
+        name: data.name as string,
+        color: data.color || 'primary',
+        ...(data.description && { description: data.description }),
+        promptCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      tags.value.push(newTag)
+      console.log('创建标签成功:', newTag)
+    } else if (editingTag.value) {
+      // 更新标签
+      const index = tags.value.findIndex(t => t.id === editingTag.value!.id)
+      if (index !== -1) {
+        tags.value[index] = {
+          ...tags.value[index],
+          ...(data.name && { name: data.name }),
+          ...(data.color && { color: data.color }),
+          ...(data.description !== undefined && { description: data.description }),
+          updatedAt: new Date().toISOString()
+        }
+        console.log('更新标签成功:', tags.value[index])
+      }
+    }
+    tagDialogVisible.value = false
+  } catch (error) {
+    console.error('保存标签失败:', error)
+  }
+}
+
+const handleTagDeleteConfirm = () => {
+  if (deletingTag.value) {
+    const tagId = deletingTag.value.id
+    const affectedPrompts = prompts.value.filter(p => p.tags.includes(tagId))
+    
+    // 删除标签
+    tags.value = tags.value.filter(t => t.id !== tagId)
+    
+    // 从提示词中移除标签关联
+    affectedPrompts.forEach(prompt => {
+      prompt.tags = prompt.tags.filter(t => t !== tagId)
+    })
+    
+    // 如果当前选中的是被删除的标签，重置选择
+    if (selectedTag.value?.id === tagId) {
+      selectedTag.value = null
+    }
+    
+    console.log(`删除标签成功，影响了 ${affectedPrompts.length} 个提示词`)
+    confirmDialogVisible.value = false
+    deletingTag.value = null
+  }
+}
+
+// 处理容器点击事件，用于关闭标签菜单
+const handleContainerClick = (event: Event) => {
+  console.log('容器点击事件:', event.target)
+  const target = event.target as HTMLElement
+  const isTagMenu = target.closest('.tag-menu') || target.closest('.tag-dropdown')
+  
+  if (!isTagMenu) {
+    console.log('点击容器外部，通知TagPanel关闭菜单')
+    // 通过ref调用TagPanel的关闭方法
+    if (tagPanelRef.value && tagPanelRef.value.closeAllMenus) {
+      tagPanelRef.value.closeAllMenus()
+    }
+  }
 }
 
 const viewPrompt = (prompt: Prompt) => {
@@ -87,11 +197,60 @@ const deletePrompt = (prompt: Prompt) => {
 onMounted(() => {
   // 初始化数据（后续会从 uTools 数据库加载）
   console.log('提示词管理页面已加载')
+  
+  // 临时添加一些测试数据
+  tags.value = [
+    {
+      id: '1',
+      name: 'AI写作',
+      color: 'primary',
+      promptCount: 3,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: '2', 
+      name: '编程助手',
+      color: 'info',
+      promptCount: 5,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: '3',
+      name: '翻译工具',
+      color: 'success',
+      promptCount: 2,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ]
+  
+  prompts.value = [
+    {
+      id: '1',
+      title: '技术文档写作助手',
+      content: '你是一个专业的技术文档写作助手，请帮我编写清晰、准确的技术文档...',
+      tags: ['1', '2'],
+      source: '个人创建',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: '2',
+      title: 'Vue 3 代码生成器',
+      content: '根据用户需求生成符合 Vue 3 最佳实践的代码...',
+      tags: ['2'],
+      source: '社区分享',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ]
 })
 </script>
 
 <template>
-  <div class="prompt-manager-container">
+  <div class="prompt-manager-container" @click="handleContainerClick">
     <!-- 顶部操作栏 -->
     <div class="top-toolbar">
       <div class="toolbar-right">
@@ -128,42 +287,17 @@ onMounted(() => {
     <!-- 主内容区域：左侧标签面板 + 右侧卡片区域 -->
     <div class="main-content">
       <!-- 左侧标签面板 (20%) -->
-      <aside class="tag-panel">
-        <div class="panel-header">
-          <h3>标签分类</h3>
-          <button class="btn-add-tag" @click="addTag">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="tag-list">
-          <!-- 全部标签 -->
-          <div 
-            class="tag-item all-tag" 
-            :class="{ active: selectedTag === null }"
-            @click="selectTag(null)"
-          >
-            <span class="tag-name">全部</span>
-            <span class="tag-count">{{ promptCount }}</span>
-          </div>
-          
-          <!-- 标签列表 -->
-          <div 
-            v-for="tag in tags" 
-            :key="tag.id"
-            class="tag-item"
-            :class="{ active: selectedTag?.id === tag.id }"
-            @click="selectTag(tag)"
-          >
-            <span class="tag-color" :style="{ backgroundColor: tag.color }"></span>
-            <span class="tag-name">{{ tag.name }}</span>
-            <span class="tag-count">{{ getTagPromptCount(tag.id) }}</span>
-          </div>
-        </div>
-      </aside>
+      <TagPanel
+        ref="tagPanelRef"
+        :tags="tags"
+        :selected-tag="selectedTag"
+        :prompt-count="promptCount"
+        :tag-prompt-counts="tagPromptCounts"
+        @tag-select="handleTagSelect"
+        @tag-add="handleTagAdd"
+        @tag-edit="handleTagEdit"
+        @tag-delete="handleTagDelete"
+      />
 
       <!-- 右侧提示词卡片区域 (80%) -->
       <main class="card-area">
@@ -242,6 +376,26 @@ onMounted(() => {
         </div>
       </main>
     </div>
+
+    <!-- 标签对话框 -->
+    <TagDialog
+      v-model:visible="tagDialogVisible"
+      :mode="tagDialogMode"
+      :tag="editingTag"
+      @confirm="handleTagDialogConfirm"
+    />
+
+    <!-- 删除确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="confirmDialogVisible"
+      title="删除标签"
+      :message="`确定要删除标签「${deletingTag?.name}」吗？`"
+      :detail="`删除后，关联此标签的 ${deletingTag ? getTagPromptCount(deletingTag.id) : 0} 个提示词将移除此标签关联，但提示词本身不会被删除。`"
+      confirm-text="删除"
+      cancel-text="取消"
+      type="danger"
+      @confirm="handleTagDeleteConfirm"
+    />
   </div>
 </template>
 
@@ -339,108 +493,7 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.tag-panel {
-  width: 240px;
-  min-width: 200px;
-  background: white;
-  border-right: 1px solid var(--border-color);
-  padding: 16px;
-  overflow-y: auto;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.panel-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-color);
-  margin: 0;
-}
-
-.btn-add-tag {
-  background: none;
-  border: none;
-  color: var(--text-color-secondary);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.btn-add-tag:hover {
-  background: var(--hover-background);
-  color: var(--primary-color);
-}
-
-.tag-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tag-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tag-item:hover {
-  background: var(--hover-background);
-}
-
-.tag-item.active {
-  background: var(--primary-color);
-  color: white;
-  box-shadow: 0 2px 8px rgba(0, 178, 90, 0.3);
-}
-
-.tag-item.all-tag {
-  font-weight: 500;
-  border: 2px solid var(--border-color);
-}
-
-.tag-item.all-tag.active {
-  border-color: transparent;
-}
-
-.tag-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.tag-name {
-  flex: 1;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tag-count {
-  font-size: 12px;
-  color: var(--text-color-secondary);
-  background: rgba(0, 0, 0, 0.1);
-  padding: 2px 8px;
-  border-radius: 12px;
-  min-width: 20px;
-  text-align: center;
-}
-
-.tag-item.active .tag-count {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
+/* 标签面板样式已移至 TagPanel.vue 组件 */
 
 .card-area {
   flex: 1;

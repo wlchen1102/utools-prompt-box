@@ -18,7 +18,7 @@ export type TagColor =
 // 标签基础接口
 export interface Tag {
   id: string                    // 唯一标识符
-  name: string                  // 标签名称（最多6个字符）
+  name: string                  // 标签名称（最多20个字符）
   color: TagColor              // 标签颜色
   description?: string         // 标签描述
   promptCount: number          // 关联的提示词数量
