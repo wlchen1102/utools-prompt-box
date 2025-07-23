@@ -1,0 +1,28 @@
+{
+  "pluginName": "提示词管理工具",
+  "description": "高效管理AI提示词的uTools插件，支持标签分类、搜索筛选、本地存储等功能",
+  "author": "猫来gogogo",
+  "homepage": "",
+  "version": "1.0.0",
+  "logo": "logo.png",
+  "main": "dist/index.html",
+  "preload": "dist/preload.js",
+  "platform": ["win32", "darwin", "linux"],
+  "development": {
+    "main": "http://127.0.0.1:3000",
+    "preload": "preload.js"
+  },
+  "features": [
+    {
+      "code": "prompt-manager",
+      "explain": "提示词管理工具",
+      "cmds": [
+        "提示词管理",
+        "prompt",
+        "prompts",
+        "提示词",
+        "pm"
+      ]
+    }
+  ]
+} 

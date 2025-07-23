@@ -1,0 +1,143 @@
+/* 提示词管理工具主题色彩系统 */
+
+:root {
+  /* 主题色彩 */
+  --primary-color: #00B25A;
+  --primary-color-hover: #009949;
+  --primary-color-pressed: #007a3a;
+  --primary-color-suppl: #00D666;
+  
+  /* 语义色彩 */
+  --success-color: #00B25A;
+  --info-color: #2080f0;
+  --warning-color: #f0a020;
+  --error-color: #d03050;
+  
+  /* 中性色彩 */
+  --text-color: #333333;
+  --text-color-2: #666666;
+  --text-color-3: #999999;
+  --text-color-disabled: #cccccc;
+  
+  /* 背景色彩 */
+  --body-color: #ffffff;
+  --card-color: #ffffff;
+  --modal-color: #ffffff;
+  --popover-color: #ffffff;
+  
+  /* 边框色彩 */
+  --border-color: #e0e0e6;
+  --divider-color: #efeff5;
+  
+  /* 阴影效果 */
+  --box-shadow-1: 0 1px 2px -2px rgba(0, 0, 0, 0.08), 0 3px 6px 0 rgba(0, 0, 0, 0.06), 0 5px 12px 4px rgba(0, 0, 0, 0.04);
+  --box-shadow-2: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+  --box-shadow-3: 0 6px 16px -9px rgba(0, 0, 0, 0.08), 0 9px 28px 0 rgba(0, 0, 0, 0.05), 0 12px 48px 16px rgba(0, 0, 0, 0.03);
+  
+  /* 卡片阴影 - 明显的阴影效果 */
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --card-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* 全局样式重置 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--body-color);
+  color: var(--text-color);
+}
+
+/* 卡片样式类 */
+.pm-card {
+  background: var(--card-color);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.3s ease;
+}
+
+.pm-card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* 主题色按钮样式 */
+.pm-button-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.pm-button-primary:hover {
+  background-color: var(--primary-color-hover);
+  border-color: var(--primary-color-hover);
+}
+
+.pm-button-primary:active {
+  background-color: var(--primary-color-pressed);
+  border-color: var(--primary-color-pressed);
+}
+
+/* 选中状态高亮 */
+.pm-selected {
+  color: var(--primary-color);
+  background-color: rgba(0, 178, 90, 0.1);
+}
+
+/* 标签样式 */
+.pm-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 布局辅助类 */
+.pm-flex {
+  display: flex;
+}
+
+.pm-flex-column {
+  flex-direction: column;
+}
+
+.pm-flex-center {
+  justify-content: center;
+  align-items: center;
+}
+
+.pm-flex-between {
+  justify-content: space-between;
+}
+
+.pm-flex-1 {
+  flex: 1;
+}
+
+/* 间距辅助类 */
+.pm-mt-8 { margin-top: 8px; }
+.pm-mt-16 { margin-top: 16px; }
+.pm-mb-8 { margin-bottom: 8px; }
+.pm-mb-16 { margin-bottom: 16px; }
+.pm-ml-8 { margin-left: 8px; }
+.pm-ml-16 { margin-left: 16px; }
+.pm-mr-8 { margin-right: 8px; }
+.pm-mr-16 { margin-right: 16px; }
+
+.pm-p-8 { padding: 8px; }
+.pm-p-16 { padding: 16px; }
+.pm-px-8 { padding-left: 8px; padding-right: 8px; }
+.pm-px-16 { padding-left: 16px; padding-right: 16px; }
+.pm-py-8 { padding-top: 8px; padding-bottom: 8px; }
+.pm-py-16 { padding-top: 16px; padding-bottom: 16px; } 
