@@ -11,16 +11,16 @@ export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
-    // 自定义插件：拷贝 preload.cjs 到 dist 目录
+    // 自定义插件：拷贝 preload.js 到 dist 目录
     {
       name: 'copy-preload',
       writeBundle() {
         try {
           copyFileSync(
-            resolve(__dirname, 'preload.cjs'),
+            resolve(__dirname, 'preload.js'),
             resolve(__dirname, 'dist/preload.js')
           )
-          console.log('preload.cjs 已拷贝到 dist/preload.js')
+          console.log('preload.js 已拷贝到 dist 目录')
         } catch (error) {
           console.warn('拷贝 preload 文件失败:', error)
         }

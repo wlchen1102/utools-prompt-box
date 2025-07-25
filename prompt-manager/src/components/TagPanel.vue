@@ -193,7 +193,7 @@ onUnmounted(() => {
           <div 
             class="tag-menu" 
             :class="{ 'menu-open': activeMenuId === tag.id }"
-            v-if="!tag.id.startsWith('all')"
+            v-if="tag.id && !tag.id.startsWith('all')"
           >
             <button 
               class="tag-menu-btn" 

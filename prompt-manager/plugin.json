@@ -10,7 +10,7 @@
   "platform": ["win32", "darwin", "linux"],
   "development": {
     "main": "http://127.0.0.1:3000",
-    "preload": "preload.cjs"
+    "preload": "preload.js"
   },
   "features": [
     {
