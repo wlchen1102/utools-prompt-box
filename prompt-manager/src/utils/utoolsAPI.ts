@@ -36,10 +36,12 @@ export class UtoolsDB {
     
     // 获取现有文档以获得正确的 _rev
     const existingDoc = window.utools.db.get(dbKey)
+    console.log('🔍 获取现有文档:', { dbKey, existingDoc })
     
+    // 构建要保存的文档 - 直接使用业务数据作为文档内容，而不是嵌套在data字段中
     const doc = {
       _id: dbKey,
-      data,
+      ...data as object, // 直接展开业务数据
       updatedAt: new Date().toISOString(),
       // 如果存在现有文档，使用其 _rev 来避免冲突
       ...(existingDoc && existingDoc._rev && { _rev: existingDoc._rev })
@@ -66,7 +68,12 @@ export class UtoolsDB {
     }
 
     const doc = window.utools.db.get(this.getKey(id))
-    return doc ? doc.data : null
+    if (!doc) return null
+    
+    // 过滤掉 uTools 内部字段，返回业务数据
+    const { _id, _rev, updatedAt, ...businessData } = doc
+    console.log('📖 从 uTools 数据库读取数据:', { id, doc, businessData })
+    return businessData as T
   }
 
   /**
@@ -104,7 +111,15 @@ export class UtoolsDB {
       // 使用正确的 uTools API 获取所有文档
       const docs = window.utools.db.allDocs(`${this.dbPrefix}`)
       console.log('uTools.db.allDocs 返回:', docs)
-      return docs.map(doc => doc.data || doc.value).filter(Boolean)
+      
+      return docs.map(doc => {
+        // 过滤掉 uTools 内部字段，返回业务数据
+        const rawDoc = doc.data || doc.value || doc
+        if (!rawDoc) return null
+        
+        const { _id, _rev, updatedAt, ...businessData } = rawDoc
+        return businessData
+      }).filter(Boolean)
     } catch (error) {
       console.error('获取所有文档失败:', error)
       return []
