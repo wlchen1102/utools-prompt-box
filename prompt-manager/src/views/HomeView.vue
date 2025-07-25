@@ -6,12 +6,14 @@ import { TAG_COLOR_CONFIGS } from '@/types/Tag'
 import TagPanel from '@/components/TagPanel.vue'
 import TagDialog from '@/components/TagDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useTagStore } from '@/stores/tagStore'
+
+// 使用 store
+const tagStore = useTagStore()
 
 // 响应式数据
 const searchKeyword = ref('')
-const selectedTag = ref<Tag | null>(null)
 const prompts = ref<Prompt[]>([])
-const tags = ref<Tag[]>([])
 
 // 对话框状态
 const tagDialogVisible = ref(false)
@@ -28,7 +30,7 @@ const promptCount = computed(() => prompts.value.length)
 
 const tagPromptCounts = computed(() => {
   const counts: Record<string, number> = {}
-  tags.value.forEach(tag => {
+  tagStore.tags.forEach((tag: Tag) => {
     counts[tag.id] = getTagPromptCount(tag.id)
   })
   return counts
@@ -38,9 +40,9 @@ const filteredPrompts = computed(() => {
   let filtered = prompts.value
 
   // 按标签筛选
-  if (selectedTag.value) {
+  if (tagStore.selectedTag) {
     filtered = filtered.filter(prompt => 
-      prompt.tags.includes(selectedTag.value!.id)
+      prompt.tags.includes(tagStore.selectedTag!.id)
     )
   }
 
@@ -58,7 +60,7 @@ const filteredPrompts = computed(() => {
 
 // 方法
 const handleTagSelect = (tag: Tag | null) => {
-  selectedTag.value = tag
+  tagStore.selectTag(tag)
 }
 
 const getTagPromptCount = (tagId: string) => {
@@ -66,12 +68,12 @@ const getTagPromptCount = (tagId: string) => {
 }
 
 const getTagName = (tagId: string) => {
-  const tag = tags.value.find(t => t.id === tagId)
+  const tag = tagStore.tags.find((t: Tag) => t.id === tagId)
   return tag?.name || ''
 }
 
 const getTagColor = (tagId: string) => {
-  const tag = tags.value.find(t => t.id === tagId)
+  const tag = tagStore.tags.find((t: Tag) => t.id === tagId)
   const colorConfig = TAG_COLOR_CONFIGS[tag?.color as keyof typeof TAG_COLOR_CONFIGS] || TAG_COLOR_CONFIGS.default
   return colorConfig.hex
 }
@@ -105,30 +107,19 @@ const handleTagDelete = (tag: Tag) => {
 const handleTagDialogConfirm = async (data: CreateTagDTO | UpdateTagDTO) => {
   try {
     if (tagDialogMode.value === 'create') {
-      // 创建新标签
-      const newTag: Tag = {
-        id: Date.now().toString(),
-        name: data.name as string,
-        color: data.color || 'primary',
-        ...(data.description && { description: data.description }),
-        promptCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      // 使用 store 创建标签
+      const result = await tagStore.createTag(data as CreateTagDTO)
+      if (!result.success) {
+        console.error('创建标签失败:', result.error)
+        // TODO: 这里可以显示错误提示给用户
       }
-      tags.value.push(newTag)
-      console.log('创建标签成功:', newTag)
     } else if (editingTag.value) {
-      // 更新标签
-      const index = tags.value.findIndex(t => t.id === editingTag.value!.id)
-      if (index !== -1) {
-        tags.value[index] = {
-          ...tags.value[index],
-          ...(data.name && { name: data.name }),
-          ...(data.color && { color: data.color }),
-          ...(data.description !== undefined && { description: data.description }),
-          updatedAt: new Date().toISOString()
-        }
-        console.log('更新标签成功:', tags.value[index])
+      // 使用 store 更新标签
+      const result = await tagStore.updateTag(editingTag.value.id, data as UpdateTagDTO)
+      if (!result.success) {
+        console.error('更新标签失败:', result.error)
+        alert(`更新标签失败：${result.error}`)
+        return // 失败时不关闭对话框，让用户可以重试
       }
     }
     tagDialogVisible.value = false
@@ -137,25 +128,29 @@ const handleTagDialogConfirm = async (data: CreateTagDTO | UpdateTagDTO) => {
   }
 }
 
-const handleTagDeleteConfirm = () => {
+const handleTagDeleteConfirm = async () => {
   if (deletingTag.value) {
-    const tagId = deletingTag.value.id
-    const affectedPrompts = prompts.value.filter(p => p.tags.includes(tagId))
-    
-    // 删除标签
-    tags.value = tags.value.filter(t => t.id !== tagId)
-    
-    // 从提示词中移除标签关联
-    affectedPrompts.forEach(prompt => {
-      prompt.tags = prompt.tags.filter(t => t !== tagId)
-    })
-    
-    // 如果当前选中的是被删除的标签，重置选择
-    if (selectedTag.value?.id === tagId) {
-      selectedTag.value = null
+    try {
+      const tagId = deletingTag.value.id
+      
+      // 从提示词中移除标签关联（删除前先处理）
+      const affectedPrompts = prompts.value.filter(p => p.tags.includes(tagId))
+      affectedPrompts.forEach(prompt => {
+        prompt.tags = prompt.tags.filter(t => t !== tagId)
+      })
+      
+      // 使用 store 删除标签
+      const result = await tagStore.deleteTag(tagId)
+      if (result.success) {
+        console.log(`删除标签成功，影响了 ${affectedPrompts.length} 个提示词`)
+      } else {
+        console.error('删除标签失败:', result.error)
+        // TODO: 这里可以显示错误提示给用户
+      }
+    } catch (error) {
+      console.error('删除标签失败:', error)
     }
     
-    console.log(`删除标签成功，影响了 ${affectedPrompts.length} 个提示词`)
     confirmDialogVisible.value = false
     deletingTag.value = null
   }
@@ -194,37 +189,11 @@ const deletePrompt = (prompt: Prompt) => {
 }
 
 // 生命周期
-onMounted(() => {
-  // 初始化数据（后续会从 uTools 数据库加载）
-  console.log('提示词管理页面已加载')
+onMounted(async () => {
+  console.log('🏠 HomeView onMounted 被调用')
   
-  // 临时添加一些测试数据
-  tags.value = [
-    {
-      id: '1',
-      name: 'AI写作',
-      color: 'primary',
-      promptCount: 3,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: '2', 
-      name: '编程助手',
-      color: 'info',
-      promptCount: 5,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: '3',
-      name: '翻译工具',
-      color: 'success',
-      promptCount: 2,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  ]
+  // 只在未加载时加载标签数据，避免覆盖已更新的数据
+  await tagStore.loadTags(false)
   
   prompts.value = [
     {
@@ -289,8 +258,8 @@ onMounted(() => {
       <!-- 左侧标签面板 (20%) -->
       <TagPanel
         ref="tagPanelRef"
-        :tags="tags"
-        :selected-tag="selectedTag"
+        :tags="tagStore.tags"
+        :selected-tag="tagStore.selectedTag"
         :prompt-count="promptCount"
         :tag-prompt-counts="tagPromptCounts"
         @tag-select="handleTagSelect"

@@ -52,7 +52,7 @@ export class TagService {
       }
 
       // 保存到数据库
-      await this.db.put(`${TagService.TAG_STORE_KEY}_${newTag.id}`, newTag)
+      this.db.put(`${TagService.TAG_STORE_KEY}_${newTag.id}`, newTag)
 
       return {
         success: true,
@@ -106,7 +106,20 @@ export class TagService {
       }
 
       // 保存到数据库
-      await this.db.put(`${TagService.TAG_STORE_KEY}_${id}`, updatedTag)
+      const saveKey = `${TagService.TAG_STORE_KEY}_${id}`
+      console.log('💾 准备保存更新的标签:', { saveKey, updatedTag })
+      const saveResult = this.db.put(saveKey, updatedTag)
+      console.log('💾 标签保存结果:', saveResult)
+
+      // 检查保存是否成功 - 需要处理 uTools 数据库可能返回的不同格式
+      const result = saveResult as any
+      if (result.error || !result.ok) {
+        console.error('💥 标签保存失败:', saveResult)
+        return {
+          success: false,
+          error: result.message || '保存标签失败，可能存在版本冲突'
+        }
+      }
 
       return {
         success: true,
@@ -177,13 +190,21 @@ export class TagService {
    */
   async getAllTags(): Promise<Tag[]> {
     try {
+      // 直接调用同步的 allDocs 方法
       const allTags = this.db.allDocs<Tag>()
+      console.log('从数据库获取的所有标签:', allTags)
+      
       const tags = allTags.filter(tag => 
         tag && tag.id && tag.id.startsWith('tag_') && !tag.isDeleted
       )
+      
+      console.log('过滤后的标签:', tags)
 
       // 按创建时间排序
-      return tags.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      const sortedTags = tags.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      console.log('排序后的标签:', sortedTags)
+      
+      return sortedTags
     } catch (error) {
       console.error('获取标签列表失败:', error)
       return []
@@ -270,7 +291,7 @@ export class TagService {
         total: 0,
         used: 0,
         unused: 0,
-        colorStats: {},
+        colorStats: {} as Record<TagColor, number>,
         averagePromptCount: 0
       }
     }
@@ -287,7 +308,7 @@ export class TagService {
       tag.promptCount = count
       tag.updatedAt = new Date().toISOString()
 
-      await this.db.put(`${TagService.TAG_STORE_KEY}_${tagId}`, tag)
+      this.db.put(`${TagService.TAG_STORE_KEY}_${tagId}`, tag)
       return true
     } catch (error) {
       console.error('更新标签提示词数量失败:', error)
@@ -341,7 +362,7 @@ export class TagService {
           tag.id = `tag_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         }
 
-        await this.db.put(`${TagService.TAG_STORE_KEY}_${tag.id}`, tag)
+        this.db.put(`${TagService.TAG_STORE_KEY}_${tag.id}`, tag)
         success++
       } catch (error) {
         console.error('导入标签失败:', tag, error)

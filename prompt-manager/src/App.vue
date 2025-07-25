@@ -5,11 +5,20 @@ import { onMounted } from 'vue'
 onMounted(() => {
   console.log('提示词管理工具已启动')
   
-  // 如果在 uTools 环境中，设置窗口标题
+  // 如果在 uTools 环境中，初始化插件
   if (typeof window.utools !== 'undefined') {
-    window.utools.setSubInputValue = function() {
-      // 可以在这里处理 uTools 的输入
+    console.log('uTools 环境检测到，插件已就绪')
+    
+    // 可以在这里进行 uTools 相关的初始化
+    // 注意：不要直接赋值给 utools 的方法，而是调用它们
+    try {
+      // 示例：设置插件就绪状态
+      // window.utools.onPluginReady(callback)
+    } catch (error) {
+      console.warn('uTools API 调用失败:', error)
     }
+  } else {
+    console.log('非 uTools 环境，运行在开发模式')
   }
 })
 </script>

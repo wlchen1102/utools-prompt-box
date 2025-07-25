@@ -22,20 +22,34 @@ export class UtoolsDB {
   /**
    * 存储数据
    */
-  put<T = any>(id: string, data: T): { ok: boolean; id: string; rev: string } {
+  put<T = any>(id: string, data: T): any {
     if (!isUToolsEnv()) {
       // 开发环境使用 localStorage 模拟
-      localStorage.setItem(this.getKey(id), JSON.stringify(data))
+      const key = this.getKey(id)
+      const jsonData = JSON.stringify(data)
+      localStorage.setItem(key, jsonData)
+      console.log('📝 保存数据到 localStorage:', { key, data })
       return { ok: true, id, rev: Date.now().toString() }
     }
 
+    const dbKey = this.getKey(id)
+    
+    // 获取现有文档以获得正确的 _rev
+    const existingDoc = window.utools.db.get(dbKey)
+    
     const doc = {
-      _id: this.getKey(id),
+      _id: dbKey,
       data,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      // 如果存在现有文档，使用其 _rev 来避免冲突
+      ...(existingDoc && existingDoc._rev && { _rev: existingDoc._rev })
     }
 
-    return window.utools.db.put(doc)
+    console.log('📝 准备保存文档到 uTools 数据库:', { doc, existingDoc })
+    const result = window.utools.db.put(doc)
+    console.log('📝 uTools 数据库保存结果:', result)
+    
+    return result
   }
 
   /**
@@ -44,8 +58,11 @@ export class UtoolsDB {
   get<T = any>(id: string): T | null {
     if (!isUToolsEnv()) {
       // 开发环境使用 localStorage 模拟
-      const data = localStorage.getItem(this.getKey(id))
-      return data ? JSON.parse(data) : null
+      const key = this.getKey(id)
+      const data = localStorage.getItem(key)
+      const result = data ? JSON.parse(data) : null
+      console.log('📖 从 localStorage 读取数据:', { key, result })
+      return result
     }
 
     const doc = window.utools.db.get(this.getKey(id))
@@ -72,14 +89,26 @@ export class UtoolsDB {
     if (!isUToolsEnv()) {
       // 开发环境使用 localStorage 模拟
       const keys = Object.keys(localStorage).filter(key => key.startsWith(this.dbPrefix))
-      return keys.map(key => {
+      console.log('🔍 localStorage 中所有匹配的键:', keys)
+      
+      const results = keys.map(key => {
         const data = localStorage.getItem(key)
         return data ? JSON.parse(data) : null
       }).filter(Boolean)
+      
+      console.log('📦 allDocs 返回的数据:', results)
+      return results
     }
 
-    const docs = window.utools.db.allDocs(this.dbPrefix)
-    return docs.map(doc => doc.data).filter(Boolean)
+    try {
+      // 使用正确的 uTools API 获取所有文档
+      const docs = window.utools.db.allDocs(`${this.dbPrefix}`)
+      console.log('uTools.db.allDocs 返回:', docs)
+      return docs.map(doc => doc.data || doc.value).filter(Boolean)
+    } catch (error) {
+      console.error('获取所有文档失败:', error)
+      return []
+    }
   }
 
   /**
