@@ -1,4 +1,9 @@
 ---
+description: 
+globs:
+alwaysApply: true
+---
+---
 alwaysApply: true
 ---
 1、你要及时更新.cursor\rules\prompt-manager\tasks.md 文件，让我知道你完成了哪些任务。

@@ -309,6 +309,11 @@ onUnmounted(() => {
   transition: all 0.2s ease;
   position: relative;
   min-height: 40px;
+  z-index: 1;
+}
+
+.tag-item:hover {
+  z-index: 10;
 }
 
 .tag-item:hover {
@@ -410,6 +415,7 @@ onUnmounted(() => {
   transform: translateY(-50%);
   opacity: 0;
   transition: opacity 0.2s ease;
+  z-index: 10000;
 }
 
 /* 当菜单打开时，保持菜单可见，不受hover影响 */
@@ -445,12 +451,16 @@ onUnmounted(() => {
   background: white;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.2),
+    0 4px 8px rgba(0, 0, 0, 0.1);
   padding: 4px 0;
   min-width: 80px;
-  z-index: 1000;
+  z-index: 9999;
   margin-top: 4px;
   animation: fadeInDown 0.2s ease-out;
+  /* 确保菜单在所有内容之上 */
+  isolation: isolate;
 }
 
 @keyframes fadeInDown {
