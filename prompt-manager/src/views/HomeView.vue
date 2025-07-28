@@ -6,6 +6,7 @@ import { TAG_COLOR_CONFIGS } from '@/types/Tag'
 import TagPanel from '@/components/TagPanel.vue'
 import TagDialog from '@/components/TagDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import PromptViewDialog from '@/components/PromptViewDialog.vue'
 import { useTagStore } from '@/stores/tagStore'
 
 // 使用 store
@@ -21,6 +22,10 @@ const tagDialogMode = ref<'create' | 'edit'>('create')
 const editingTag = ref<Tag | null>(null)
 const confirmDialogVisible = ref(false)
 const deletingTag = ref<Tag | null>(null)
+
+// 提示词查看弹窗状态
+const promptViewDialogVisible = ref(false)
+const viewingPrompt = ref<Prompt | null>(null)
 
 // TagPanel组件引用
 const tagPanelRef = ref()
@@ -172,20 +177,40 @@ const handleContainerClick = (event: Event) => {
 }
 
 const viewPrompt = (prompt: Prompt) => {
-  console.log('查看提示词:', prompt)
+  console.log('查看提示词被调用:', prompt) // 调试日志
+  viewingPrompt.value = prompt
+  promptViewDialogVisible.value = true
 }
 
-const copyPrompt = (prompt: Prompt) => {
-  console.log('复制提示词:', prompt)
-  // 后续会集成 uTools API
+const copyPrompt = async (prompt: Prompt) => {
+  try {
+    // 构建要复制的内容
+    const content = `# ${prompt.title}\n\n${prompt.content}`
+    
+    // 尝试使用 uTools API 复制
+    if (window.utools && window.utools.copyText) {
+      window.utools.copyText(content)
+      if (window.utools.showNotification) {
+        window.utools.showNotification('已复制到剪贴板')
+      }
+    } else {
+      // 开发环境下使用浏览器 API
+      await navigator.clipboard.writeText(content)
+      console.log('已复制到剪贴板:', prompt.title)
+    }
+  } catch (error) {
+    console.error('复制失败:', error)
+  }
 }
 
 const editPrompt = (prompt: Prompt) => {
   console.log('编辑提示词:', prompt)
+  // TODO: 实现编辑功能
 }
 
 const deletePrompt = (prompt: Prompt) => {
   console.log('删除提示词:', prompt)
+  // TODO: 实现删除功能
 }
 
 // 生命周期
@@ -364,6 +389,15 @@ onMounted(async () => {
       cancel-text="取消"
       type="danger"
       @confirm="handleTagDeleteConfirm"
+    />
+
+    <!-- 提示词查看弹窗 -->
+    <PromptViewDialog
+      v-model:visible="promptViewDialogVisible"
+      :prompt="viewingPrompt"
+      :tags="tagStore.tags"
+      @copy="copyPrompt"
+      @edit="editPrompt"
     />
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, computed } from 'vue'
 import type { Prompt } from '@/types/Prompt'
 import type { Tag } from '@/types/Tag'
 import { TAG_COLOR_CONFIGS } from '@/types/Tag'
@@ -8,6 +8,7 @@ import { TAG_COLOR_CONFIGS } from '@/types/Tag'
 interface Props {
   prompt: Prompt
   tags: Tag[]
+  highlighted?: boolean
 }
 
 const props = defineProps<Props>()
@@ -22,13 +23,39 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 
+// 计算属性
+const cardClasses = computed(() => ({
+  'prompt-card': true,
+  'highlighted': props.highlighted
+}))
+
 // 方法
 const handleView = () => {
   emit('view', props.prompt)
 }
 
-const handleCopy = () => {
-  emit('copy', props.prompt)
+const handleCopy = async () => {
+  try {
+    // 复制 Markdown 格式内容到剪贴板
+    const markdownContent = `# ${props.prompt.title}\n\n${props.prompt.content}`
+    
+    if (window.utools) {
+      // uTools 环境下使用原生 API
+      window.utools.copyText(markdownContent)
+      window.utools.showNotification('提示词已复制到剪贴板')
+    } else {
+      // 开发环境下使用浏览器 API
+      await navigator.clipboard.writeText(markdownContent)
+      console.log('提示词已复制到剪贴板')
+    }
+    
+    emit('copy', props.prompt)
+  } catch (error) {
+    console.error('复制失败:', error)
+    if (window.utools) {
+      window.utools.showNotification('复制失败，请重试')
+    }
+  }
 }
 
 const handleEdit = () => {
@@ -78,7 +105,7 @@ const formatTime = (timeStr: string) => {
 </script>
 
 <template>
-  <div class="prompt-card">
+  <div :class="cardClasses">
     <!-- 卡片头部 -->
     <div class="card-header">
       <h4 class="card-title" :title="prompt.title">
@@ -91,7 +118,7 @@ const formatTime = (timeStr: string) => {
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
         </button>
-        <button class="card-btn copy" @click="handleCopy" title="复制内容">
+        <button class="card-btn copy" @click="handleCopy" title="复制内容 (Markdown格式)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -116,6 +143,17 @@ const formatTime = (timeStr: string) => {
       <p class="content-preview">
         {{ getContentPreview(prompt.content) }}
       </p>
+      
+      <!-- 来源链接（如果有） -->
+      <div v-if="prompt.source" class="card-source">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+        </svg>
+        <a :href="prompt.source" target="_blank" class="source-link" :title="prompt.source">
+          来源链接
+        </a>
+      </div>
     </div>
     
     <!-- 卡片底部 -->
@@ -136,9 +174,21 @@ const formatTime = (timeStr: string) => {
         </span>
       </div>
       
-      <!-- 时间信息 -->
+      <!-- 时间和统计信息 -->
       <div class="card-meta">
-        <span class="update-time" :title="prompt.updatedAt">
+        <span v-if="prompt.usageCount > 0" class="usage-count" :title="`使用了 ${prompt.usageCount} 次`">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          {{ prompt.usageCount }}
+        </span>
+        <span v-if="prompt.isFavorite" class="favorite-mark" title="已收藏">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor">
+            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"></polygon>
+          </svg>
+        </span>
+        <span class="update-time" :title="new Date(prompt.updatedAt).toLocaleString()">
           {{ formatTime(prompt.updatedAt) }}
         </span>
       </div>
@@ -169,6 +219,19 @@ const formatTime = (timeStr: string) => {
     0 8px 25px rgba(0, 0, 0, 0.15),
     0 4px 8px rgba(0, 0, 0, 0.1);
   border-color: var(--primary-color);
+}
+
+.prompt-card.highlighted {
+  border-color: var(--primary-color);
+  box-shadow: 
+    0 4px 12px rgba(0, 178, 90, 0.2),
+    0 2px 4px rgba(0, 178, 90, 0.1);
+}
+
+.prompt-card.highlighted:hover {
+  box-shadow: 
+    0 8px 25px rgba(0, 178, 90, 0.25),
+    0 4px 8px rgba(0, 178, 90, 0.15);
 }
 
 .card-header {
@@ -244,13 +307,37 @@ const formatTime = (timeStr: string) => {
   font-size: 14px;
   color: var(--text-color-secondary);
   line-height: 1.6;
-  margin: 0;
+  margin: 0 0 8px 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
   min-height: 60px;
+}
+
+.card-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.source-link {
+  font-size: 12px;
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.source-link:hover {
+  color: #00a555;
+  text-decoration: underline;
+}
+
+.card-source svg {
+  color: var(--text-color-secondary);
+  flex-shrink: 0;
 }
 
 .card-footer {
@@ -294,6 +381,21 @@ const formatTime = (timeStr: string) => {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.usage-count {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.favorite-mark {
+  color: #ffd700;
+  display: flex;
+  align-items: center;
 }
 
 .update-time {
