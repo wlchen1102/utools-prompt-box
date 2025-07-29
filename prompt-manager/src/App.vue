@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { NMessageProvider } from 'naive-ui'
 
 // uTools 插件初始化
 onMounted(() => {
@@ -24,7 +25,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="app" class="app-container">
+  <n-message-provider>
+    <div id="app" class="app-container">
     <!-- 左侧窄边栏导航 -->
     <aside class="sidebar">
       <div class="sidebar-content">
@@ -70,7 +72,8 @@ onMounted(() => {
     <main class="main-content">
       <router-view />
     </main>
-  </div>
+    </div>
+  </n-message-provider>
 </template>
 
 <style scoped>

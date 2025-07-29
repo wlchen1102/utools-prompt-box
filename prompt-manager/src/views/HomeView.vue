@@ -7,7 +7,11 @@ import TagPanel from '@/components/TagPanel.vue'
 import TagDialog from '@/components/TagDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PromptViewDialog from '@/components/PromptViewDialog.vue'
+import PromptDialog from '@/components/PromptDialog.vue'
+import SearchBar from '@/components/SearchBar.vue'
 import { useTagStore } from '@/stores/tagStore'
+import type { PromptSearchParams } from '@/types/Prompt'
+import { promptService } from '@/services/PromptService'
 
 // 使用 store
 const tagStore = useTagStore()
@@ -15,6 +19,8 @@ const tagStore = useTagStore()
 // 响应式数据
 const searchKeyword = ref('')
 const prompts = ref<Prompt[]>([])
+const isLoading = ref(false)
+const searchParams = ref<PromptSearchParams>({})
 
 // 对话框状态
 const tagDialogVisible = ref(false)
@@ -26,6 +32,10 @@ const deletingTag = ref<Tag | null>(null)
 // 提示词查看弹窗状态
 const promptViewDialogVisible = ref(false)
 const viewingPrompt = ref<Prompt | null>(null)
+
+// 提示词编辑弹窗状态
+const promptDialogVisible = ref(false)
+const editingPrompt = ref<Prompt | null>(null)
 
 // TagPanel组件引用
 const tagPanelRef = ref()
@@ -87,9 +97,48 @@ const getContentPreview = (content: string) => {
   return content.length > 100 ? content.substring(0, 100) + '...' : content
 }
 
-// 操作方法（临时实现）
+// 搜索相关方法
+const handleSearch = async (params: PromptSearchParams) => {
+  console.log('搜索参数:', params)
+  searchParams.value = params
+  searchKeyword.value = params.keyword || ''
+  
+  try {
+    isLoading.value = true
+    const result = await promptService.searchPrompts(params)
+    prompts.value = result.items
+    console.log('搜索结果:', result)
+  } catch (error) {
+    console.error('搜索失败:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const handleClearSearch = async () => {
+  searchParams.value = {}
+  searchKeyword.value = ''
+  // 重新加载所有提示词
+  await loadPrompts()
+}
+
+// 提示词操作方法
 const addPrompt = () => {
-  console.log('添加提示词')
+  editingPrompt.value = null
+  promptDialogVisible.value = true
+}
+
+const handlePromptCreated = (prompt: Prompt) => {
+  prompts.value.unshift(prompt)
+  console.log('提示词创建成功:', prompt)
+}
+
+const handlePromptUpdated = (prompt: Prompt) => {
+  const index = prompts.value.findIndex(p => p.id === prompt.id)
+  if (index !== -1) {
+    prompts.value[index] = prompt
+  }
+  console.log('提示词更新成功:', prompt)
 }
 
 const handleTagAdd = () => {
@@ -204,13 +253,35 @@ const copyPrompt = async (prompt: Prompt) => {
 }
 
 const editPrompt = (prompt: Prompt) => {
-  console.log('编辑提示词:', prompt)
-  // TODO: 实现编辑功能
+  editingPrompt.value = prompt
+  promptDialogVisible.value = true
 }
 
-const deletePrompt = (prompt: Prompt) => {
-  console.log('删除提示词:', prompt)
-  // TODO: 实现删除功能
+const deletePrompt = async (prompt: Prompt) => {
+  const result = await promptService.deletePrompt(prompt.id)
+  if (result.success) {
+    const index = prompts.value.findIndex(p => p.id === prompt.id)
+    if (index !== -1) {
+      prompts.value.splice(index, 1)
+    }
+    console.log('提示词删除成功:', prompt)
+  } else {
+    console.error('删除提示词失败:', result.error)
+  }
+}
+
+// 加载提示词数据
+const loadPrompts = async () => {
+  try {
+    isLoading.value = true
+    const loadedPrompts = await promptService.getAllPrompts()
+    prompts.value = loadedPrompts
+    console.log('提示词数据加载成功:', loadedPrompts)
+  } catch (error) {
+    console.error('加载提示词数据失败:', error)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // 生命周期
@@ -220,26 +291,8 @@ onMounted(async () => {
   // 只在未加载时加载标签数据，避免覆盖已更新的数据
   await tagStore.loadTags(false)
   
-  prompts.value = [
-    {
-      id: '1',
-      title: '技术文档写作助手',
-      content: '你是一个专业的技术文档写作助手，请帮我编写清晰、准确的技术文档...',
-      tags: ['1', '2'],
-      source: '个人创建',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: '2',
-      title: 'Vue 3 代码生成器',
-      content: '根据用户需求生成符合 Vue 3 最佳实践的代码...',
-      tags: ['2'],
-      source: '社区分享',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  ]
+  // 加载提示词数据
+  await loadPrompts()
 })
 </script>
 
@@ -250,16 +303,11 @@ onMounted(async () => {
       <div class="toolbar-right">
         <!-- 搜索框 -->
         <div class="search-box">
-          <input 
-            type="text" 
-            placeholder="搜索提示词..." 
-            class="search-input"
-            v-model="searchKeyword"
+          <SearchBar
+            :loading="isLoading"
+            @search="handleSearch"
+            @clear="handleClearSearch"
           />
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.35-4.35"></path>
-          </svg>
         </div>
         
         <!-- 统计信息 -->
@@ -399,6 +447,14 @@ onMounted(async () => {
       @copy="copyPrompt"
       @edit="editPrompt"
     />
+
+    <!-- 提示词编辑弹窗 -->
+    <PromptDialog
+      v-model:visible="promptDialogVisible"
+      :prompt="editingPrompt"
+      @prompt-created="handlePromptCreated"
+      @prompt-updated="handlePromptUpdated"
+    />
   </div>
 </template>
 
@@ -443,29 +499,6 @@ onMounted(async () => {
 .search-box {
   position: relative;
   width: 280px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 8px 12px 8px 36px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.search-input:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(0, 178, 90, 0.1);
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-color-secondary);
 }
 
 .btn-add {
