@@ -30,9 +30,9 @@ export class PromptService {
     try {
       const docs = this.db.allDocs()
       const prompts = docs
-        .filter((doc: any) => doc && doc._id && doc._id.startsWith('prompt_')) // 只处理提示词数据
+        .filter((doc: any) => doc && doc._id && doc._id.includes('prompt_')) // 只处理提示词数据
         .map((doc: any) => ({
-          id: doc._id.replace('prompt_', ''),
+          id: doc._id.replace(/^.*prompt_/, ''),
           title: doc.title || '',
           content: doc.content || '',
           tags: doc.tags || [],
@@ -59,13 +59,17 @@ export class PromptService {
    */
   async getPromptById(id: string): Promise<Prompt | null> {
     try {
-      const doc = this.db.get(`prompt_${id}`)
+      // 尝试不同的ID格式
+      let doc = this.db.get(`prompt_${id}`)
+      if (!doc) {
+        doc = this.db.get(`prompt_manager_prompt_${id}`)
+      }
       if (!doc || doc.isDeleted) {
         return null
       }
 
       return {
-        id: doc._id.replace('prompt_', ''),
+        id: doc._id.replace(/^.*prompt_/, ''),
         title: doc.title,
         content: doc.content,
         tags: doc.tags || [],

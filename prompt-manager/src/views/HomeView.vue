@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import type { Prompt } from '@/types/Prompt'
 import type { Tag, CreateTagDTO, UpdateTagDTO } from '@/types/Tag'
 import { TAG_COLOR_CONFIGS } from '@/types/Tag'
@@ -294,6 +294,14 @@ onMounted(async () => {
   // 加载提示词数据
   await loadPrompts()
 })
+
+// 路由激活时重新加载数据
+onActivated(async () => {
+  console.log('🏠 HomeView onActivated 被调用')
+  
+  // 重新加载提示词数据
+  await loadPrompts()
+})
 </script>
 
 <template>
@@ -355,7 +363,6 @@ onMounted(async () => {
             </svg>
           </div>
           <h3>{{ searchKeyword ? '未找到相关提示词' : '还没有提示词' }}</h3>
-          <p>{{ searchKeyword ? '尝试使用其他关键词搜索' : '点击"添加提示词"开始创建您的第一个提示词' }}</p>
           <button v-if="!searchKeyword" class="btn-primary" @click="addPrompt">
             添加提示词
           </button>

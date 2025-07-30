@@ -117,7 +117,8 @@ export class UtoolsDB {
         const rawDoc = doc.data || doc.value || doc
         if (!rawDoc) return null
         
-        const { _id, _rev, updatedAt, ...businessData } = rawDoc
+        // 保留 _id 字段，因为 PromptService 需要它来过滤和提取ID
+        const { _rev, ...businessData } = rawDoc
         return businessData
       }).filter(Boolean)
     } catch (error) {
