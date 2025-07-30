@@ -1,17 +1,35 @@
 <template>
-  <n-modal
+  <n-drawer
     :show="visible"
-    preset="dialog"
-    :title="isEditing ? '编辑提示词' : '新增提示词'"
-    :positive-text="isEditing ? '保存' : '创建'"
-    negative-text="取消"
-    :loading="loading"
-    @positive-click="handleSave"
-    @negative-click="handleCancel"
-    @close="handleCancel"
+    :width="'70%'"
+    placement="right"
     @update:show="$emit('update:visible', $event)"
-    style="width: 720px; max-width: 85vw;"
+    class="prompt-drawer"
   >
+    <n-drawer-content
+      :title="isEditing ? '编辑提示词' : '新增提示词'"
+      closable
+      class="prompt-drawer-content"
+    >
+      <template #footer>
+        <div class="drawer-footer">
+          <n-button 
+            @click="handleCancel"
+            :disabled="loading"
+            size="medium"
+          >
+            取消
+          </n-button>
+          <n-button 
+            type="primary" 
+            @click="handleSave"
+            :loading="loading"
+            size="medium"
+          >
+            {{ isEditing ? '保存' : '创建' }}
+          </n-button>
+        </div>
+      </template>
     <n-form
       ref="formRef"
       :model="formData"
@@ -37,7 +55,7 @@
       <n-form-item path="content" class="form-item-clean">
         <div class="content-editor-container">
           <div class="editor-header">
-            <span class="editor-label">提示词内容</span>
+            <span class="editor-label"></span>
             <n-button 
               size="small" 
               quaternary 
@@ -96,16 +114,15 @@
       </n-form-item>
 
 
-    </n-form>
-
-
-  </n-modal>
+          </n-form>
+    </n-drawer-content>
+  </n-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { 
-  NModal, NForm, NFormItem, NInput, NButton, NSelect, NIcon,
+  NDrawer, NDrawerContent, NForm, NFormItem, NInput, NButton, NSelect, NIcon,
   useMessage, type FormInst 
 } from 'naive-ui'
 
@@ -246,11 +263,11 @@ const handleSave = async () => {
     // 基础表单验证（不包括ID验证，因为ID由服务生成）
     if (!formData.value.title.trim()) {
       message.error('请输入提示词标题')
-      return false
+      return
     }
     if (!formData.value.content.trim()) {
       message.error('请输入提示词内容')
-      return false
+      return
     }
     
     loading.value = true
@@ -269,9 +286,10 @@ const handleSave = async () => {
       if (result.success && result.data) {
         emit('prompt-updated', result.data)
         message.success('提示词更新成功')
+        emit('update:visible', false)
       } else {
         message.error(result.error || '更新失败')
-        return false
+        return
       }
     } else {
       // 新增模式
@@ -287,18 +305,15 @@ const handleSave = async () => {
       if (result.success && result.data) {
         emit('prompt-created', result.data)
         message.success('提示词创建成功')
+        emit('update:visible', false)
       } else {
         message.error(result.error || '创建失败')
-        return false
+        return
       }
     }
-    
-    emit('update:visible', false)
-    return true
   } catch (error) {
     console.error('保存失败:', error)
     message.error('保存失败，请重试')
-    return false
   } finally {
     loading.value = false
   }
@@ -313,14 +328,70 @@ tagStore.loadTags()
 </script>
 
 <style scoped>
+/* 抽屉样式 */
+.prompt-drawer {
+  z-index: 1000;
+}
+
+.prompt-drawer-content {
+  height: 100%;
+}
+
+/* 重新设计头部样式 - 添加分界线 */
+.prompt-drawer :deep(.n-drawer-header) {
+  padding: 16px 20px !important;
+  border-bottom: 1px solid var(--n-border-color) !important;
+  background: #ffffff;
+}
+
+/* 主体内容区域 - 减少上下间距 */
+.prompt-drawer :deep(.n-drawer-body) {
+  padding: 16px 20px 8px 20px !important;
+}
+
+/* 底部区域 - 添加分界线和背景 */
+.prompt-drawer :deep(.n-drawer-footer) {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  border-top: 1px solid var(--n-border-color);
+  margin-top: 0;
+  background: transparent;
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+}
+
 .prompt-dialog-form {
   padding: 0;
+  margin: 0;
 }
 
 /* 去掉标签的表单项样式 */
 .form-item-clean {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   width: 100%;
+}
+
+.form-item-clean:first-child {
+  margin-top: 0;
+}
+
+/* 消除 n-form-item 的标签预留空间 */
+.form-item-clean {
+  --n-label-height: 0 !important;
+  --n-label-padding: 0 !important;
+  --n-blank-height: auto !important;
 }
 
 .form-item-clean :deep(.n-form-item-label) {
@@ -380,6 +451,12 @@ tagStore.loadTags()
   width: 100%;
 }
 
+/* 统一所有输入框的字体大小 */
+.form-item-clean :deep(.n-input__input-el),
+.form-item-clean :deep(.n-select .n-base-selection-input__content) {
+  font-size: 16px;
+}
+
 .content-editor-container {
   width: 100%;
   border: 1px solid var(--n-border-color);
@@ -417,8 +494,8 @@ tagStore.loadTags()
 
 .content-editor :deep(.n-input__textarea) {
   font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.5;
   background: var(--n-color-embedded-popover);
 }
 
@@ -431,7 +508,10 @@ tagStore.loadTags()
   box-shadow: 0 0 0 2px var(--n-color-primary-opacity);
 }
 
-
+.drawer-footer .n-button {
+  --n-height: 32px !important;
+  --n-padding: 0 24px !important;  /* 加长按钮 */
+}
 
 
 </style> 
