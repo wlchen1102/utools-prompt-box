@@ -37,7 +37,7 @@
       <n-form-item path="content" class="form-item-clean">
         <div class="content-editor-container">
           <div class="editor-header">
-            <span class="editor-label">Markdown 格式内容</span>
+            <span class="editor-label">提示词内容</span>
             <n-button 
               size="small" 
               quaternary 
@@ -71,40 +71,18 @@
 
       <!-- 标签选择 -->
       <n-form-item path="tags" class="form-item-clean">
-        <div class="tags-selector">
-          <n-select
-            v-model:value="formData.tags"
-            multiple
-            :options="tagOptions"
-            placeholder="标签（全局功能关键字）"
-            :disabled="loading"
-            clearable
-            filterable
-            tag
-            :on-create="handleCreateTag"
-            class="tags-select"
-            size="large"
-          />
-          <n-button 
-            quaternary 
-            type="primary" 
-            size="medium"
-            @click="showTagDialog"
-            :disabled="loading"
-            class="manage-tag-btn"
-          >
-            <template #icon>
-              <n-icon>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="16"></line>
-                  <line x1="8" y1="12" x2="16" y2="12"></line>
-                </svg>
-              </n-icon>
-            </template>
-            管理标签
-          </n-button>
-        </div>
+        <n-select
+          v-model:value="formData.tags"
+          multiple
+          :options="tagOptions"
+          placeholder="标签（全局功能关键字）"
+          :disabled="loading"
+          clearable
+          filterable
+          tag
+          :on-create="handleCreateTag"
+          size="large"
+        />
       </n-form-item>
 
       <!-- 来源链接 -->
@@ -120,13 +98,7 @@
 
     </n-form>
 
-    <!-- 标签管理对话框 -->
-    <TagDialog
-      :visible="tagDialogVisible"
-      mode="create"
-      @update:visible="tagDialogVisible = $event"
-      @confirm="handleTagCreated"
-    />
+
   </n-modal>
 </template>
 
@@ -136,7 +108,7 @@ import {
   NModal, NForm, NFormItem, NInput, NButton, NSelect, NIcon,
   useMessage, type FormInst 
 } from 'naive-ui'
-import TagDialog from './TagDialog.vue'
+
 import { useTagStore } from '@/stores/tagStore'
 import type { Prompt, CreatePromptDTO, UpdatePromptDTO } from '@/types/Prompt'
 import type { Tag, CreateTagDTO, UpdateTagDTO } from '@/types/Tag'
@@ -168,7 +140,6 @@ const message = useMessage()
 // 响应式数据
 const formRef = ref<FormInst>()
 const loading = ref(false)
-const tagDialogVisible = ref(false)
 
 // 表单数据
 const formData = ref<CreatePromptDTO & { id?: string }>({
@@ -265,31 +236,7 @@ const handleCreateTag = (label: string) => {
   }
 }
 
-const showTagDialog = () => {
-  tagDialogVisible.value = true
-}
 
-const handleTagCreated = async (data: CreateTagDTO | UpdateTagDTO) => {
-  // 确保是创建标签的数据
-  if ('name' in data && typeof data.name === 'string') {
-    const createData: CreateTagDTO = {
-      name: data.name,
-      color: data.color,
-      description: data.description
-    }
-    const result = await tagStore.createTag(createData)
-    if (result.success) {
-      message.success('标签创建成功')
-    } else {
-      message.error('标签创建失败')
-    }
-  }
-}
-
-const handleTagUpdated = async (data: UpdateTagDTO) => {
-  // 这里需要 tag ID，暂时先不处理
-  message.success('标签更新成功')
-}
 
 const handleSave = async () => {
   try {
@@ -373,6 +320,7 @@ tagStore.loadTags()
 /* 去掉标签的表单项样式 */
 .form-item-clean {
   margin-bottom: 20px;
+  width: 100%;
 }
 
 .form-item-clean :deep(.n-form-item-label) {
@@ -417,22 +365,23 @@ tagStore.loadTags()
   box-shadow: 0 0 0 2px var(--n-color-primary-opacity);
 }
 
-/* 标签选择器布局 */
-.tags-selector {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+
+
+/* 确保所有输入组件宽度一致 */
+.form-item-clean :deep(.n-input),
+.form-item-clean :deep(.n-select),
+.title-input,
+.content-editor-container {
+  width: 100%;
 }
 
-.tags-select {
-  flex: 1;
-}
-
-.manage-tag-btn {
-  flex-shrink: 0;
+.form-item-clean :deep(.n-input__wrapper),
+.form-item-clean :deep(.n-select .n-base-selection) {
+  width: 100%;
 }
 
 .content-editor-container {
+  width: 100%;
   border: 1px solid var(--n-border-color);
   border-radius: 6px;
   overflow: hidden;
@@ -454,6 +403,7 @@ tagStore.loadTags()
 }
 
 .content-editor {
+  width: 100%;
   border: none !important;
   border-radius: 0 !important;
 }
@@ -462,6 +412,7 @@ tagStore.loadTags()
   border: none !important;
   border-radius: 0 !important;
   background: var(--n-color-embedded-popover);
+  width: 100%;
 }
 
 .content-editor :deep(.n-input__textarea) {
