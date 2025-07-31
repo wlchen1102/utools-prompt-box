@@ -26,23 +26,26 @@ export class UtoolsDB {
   }
 
   /**
-   * 存储数据
+   * 保存数据
+   * @param id 文档ID（可以是简单ID或完整ID）
+   * @param data 要保存的数据
    */
   put<T = any>(id: string, data: T): any {
     if (!isUToolsEnv()) {
       // 开发环境使用 localStorage 模拟
-      const key = this.getKey(id)
+      const key = id.startsWith(this.dbPrefix) ? id : this.getKey(id)
       const jsonData = JSON.stringify(data)
       localStorage.setItem(key, jsonData)
       console.log('📝 保存数据到 localStorage:', { key, data })
       return { ok: true, id, rev: Date.now().toString() }
     }
 
-    const dbKey = this.getKey(id)
+    // 检测ID是否已经包含前缀，避免重复添加
+    const dbKey = id.startsWith(this.dbPrefix) ? id : this.getKey(id)
     
     // 获取现有文档以获得正确的 _rev
     const existingDoc = window.utools.db.get(dbKey)
-    console.log('🔍 获取现有文档:', { dbKey, existingDoc })
+    console.log('🔍 获取现有文档:', { originalId: id, dbKey, existingDoc })
     
     // 构建要保存的文档 - 直接使用业务数据作为文档内容，而不是嵌套在data字段中
     const doc = {
@@ -61,21 +64,24 @@ export class UtoolsDB {
   }
 
   /**
-   * 获取数据
+   * 读取一个文档
+   * @param id 文档ID（可以是简单ID或完整ID）
    */
   get<T = any>(id: string): T | null {
     if (!isUToolsEnv()) {
-      // 开发环境使用 localStorage 模拟
-      const key = this.getKey(id)
+      // 开发环境使用 localStorage
+      const key = id.startsWith(this.dbPrefix) ? id : this.getKey(id)
       const data = localStorage.getItem(key)
       const result = data ? JSON.parse(data) : null
       console.log('📖 从 localStorage 读取数据:', { key, result })
       return result
     }
 
-    console.log('📖 准备获取文档:', this.getKey(id))
-    const doc = window.utools.db.get(this.getKey(id))
-    console.log('📖 从 uTools 数据库读取数据:', { id, doc })
+    // 检测ID是否已经包含前缀，避免重复添加
+    const dbKey = id.startsWith(this.dbPrefix) ? id : this.getKey(id)
+    console.log('📖 准备获取文档:', dbKey)
+    const doc = window.utools.db.get(dbKey)
+    console.log('📖 从 uTools 数据库读取数据:', { originalId: id, dbKey, doc })
     return doc as T
   }
 

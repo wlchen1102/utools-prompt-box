@@ -34,7 +34,7 @@ export class PromptService {
       const prompts = docs
         .filter((doc: any) => doc && doc._id && doc._id.includes('prompt_')) // 只处理提示词数据
         .map((doc: any) => ({
-          id: doc._id.replace(/^.*prompt_/, ''),
+          id: doc._id, // 直接使用完整的数据库ID，不再截取
           title: doc.title || '',
           content: doc.content || '',
           tags: doc.tags || [],
@@ -62,11 +62,9 @@ export class PromptService {
    */
   async getPromptById(id: string): Promise<Prompt | null> {
     try {
-      // 尝试不同的ID格式
-      let doc = this.db.get(`prompt_${id}`)
-      if (!doc) {
-        doc = this.db.get(`prompt_manager_prompt_${id}`)
-      }
+      console.log('🔍 获取提示词，直接使用ID:', { id })
+      
+      const doc = this.db.get(id)
       if (!doc) {
         return null
       }
@@ -78,7 +76,7 @@ export class PromptService {
       }
 
       return {
-        id: doc._id.replace(/^.*prompt_/, ''),
+        id: doc._id, // 直接使用完整ID
         title: doc.title || '',
         content: doc.content || '',
         tags: doc.tags || [],
@@ -228,7 +226,11 @@ export class PromptService {
       }
       
       console.log('准备保存的数据:', dataToSave)
-      const result = this.db.put(`prompt_${id}`, dataToSave)
+      const fullId = `prompt_manager_prompt_${id}`
+      const result = this.db.put(fullId, dataToSave)
+      
+      // 更新prompt对象的id为完整ID，以便返回给调用者
+      prompt.id = fullId
 
       if (result.ok) {
         console.log('提示词创建成功:', prompt)
@@ -257,11 +259,10 @@ export class PromptService {
    */
   async updatePrompt(id: string, data: UpdatePromptDTO): Promise<PromptOperationResult> {
     try {
-      // 先尝试直接获取原始文档
-      let doc = this.db.get(`prompt_${id}`)
-      if (!doc) {
-        doc = this.db.get(`prompt_manager_prompt_${id}`)
-      }
+      console.log('🔄 更新提示词，直接使用ID:', { id, data })
+      
+      // 直接使用完整ID获取文档
+      const doc = this.db.get(id)
       
       if (!doc) {
         return {
@@ -296,14 +297,15 @@ export class PromptService {
         updatedAt: new Date().toISOString()
       }
       
-      // 使用原始文档的 _id 进行保存，但需要去掉前缀避免重复
-      const cleanId = doc._id.replace(/^prompt_manager_/, '')
-      const result = this.db.put(cleanId, updatedData)
+      console.log('🔄 更新提示词数据:', { id, updatedData })
+      
+      // 直接使用完整ID进行保存
+      const result = this.db.put(id, updatedData)
 
       if (result.ok) {
         // 构建返回的提示词对象
         const updated: Prompt = {
-          id: doc._id.replace(/^.*prompt_/, ''),
+          id: id, // 直接使用完整ID
           title: updatedData.title,
           content: updatedData.content,
           tags: updatedData.tags,
@@ -340,13 +342,10 @@ export class PromptService {
    */
   async removePrompt(id: string): Promise<PromptOperationResult> {
     try {
-      console.log('🗑️ 开始删除提示词:', id)
+      console.log('🗑️ 开始删除提示词，直接使用ID:', id)
       
-      // 方法1：先获取文档，然后删除（推荐，因为有更好的错误处理）
-      let doc = this.db.get(`prompt_${id}`)
-      if (!doc) {
-        doc = this.db.get(`prompt_manager_prompt_${id}`)
-      }
+      // 直接使用完整ID获取文档
+      const doc = this.db.get(id)
       
       if (!doc) {
         console.log(`提示词 ${id} 在数据库中已不存在，无需删除。`)

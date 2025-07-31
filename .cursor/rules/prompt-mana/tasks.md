@@ -648,6 +648,118 @@
 
 ---
 
+### 问题记录 #6：提示词删除后仍显示在页面上 🔄 **已解决 2025-07-31**
+
+**问题现象**：
+- 提示词删除操作后提示"删除成功"，但页面上数据依然存在
+- 控制台日志显示删除成功，但刷新后数据仍然存在
+- 日志显示：`提示词删除成功: {id: 'prompt_manager_prompt_1753958216666_l7hk1x18s', ...}`
+
+**根本原因分析**：
+1. **ID处理不一致**：
+   - 现在传入的ID是完整格式：`prompt_manager_prompt_1753958216666_l7hk1x18s`
+   - 但`removePrompt`方法内部尝试添加前缀：`prompt_${id}`和`prompt_manager_prompt_${id}`
+   - 导致构造出错误的ID：`prompt_prompt_manager_prompt_1753958216666_l7hk1x18s`
+
+2. **删除方法逻辑错误**：
+   ```typescript
+   // 错误的逻辑：尝试不同的ID格式
+   let doc = this.db.get(`prompt_${id}`)
+   if (!doc) {
+     doc = this.db.get(`prompt_manager_prompt_${id}`)
+   }
+   ```
+
+3. **同样的问题也存在于`updatePrompt`方法中**：
+   ```typescript
+   // 错误的逻辑：手动构造ID
+   const cleanId = doc._id.replace(/^prompt_manager_/, '')
+   const result = this.db.put(cleanId, updatedData)
+   ```
+
+**解决方案**：
+1. **修复`removePrompt`方法**：
+   ```typescript
+   async removePrompt(id: string): Promise<PromptOperationResult> {
+     try {
+       console.log('🗑️ 开始删除提示词，直接使用ID:', id)
+       
+       // 直接使用完整ID获取文档
+       const doc = this.db.get(id)
+       
+       if (!doc) {
+         console.log(`提示词 ${id} 在数据库中已不存在，无需删除。`)
+         return {
+           success: true,
+           message: '提示词已删除'
+         }
+       }
+
+       console.log('🗑️ 找到文档，准备删除:', { id: doc._id, doc })
+       
+       // 使用文档对象删除
+       const result = this.db.remove(doc)
+       console.log('🗑️ 删除操作结果:', result)
+
+       // ...其余代码不变
+     }
+   }
+   ```
+
+2. **修复`updatePrompt`方法**：
+   ```typescript
+   async updatePrompt(id: string, data: UpdatePromptDTO): Promise<PromptOperationResult> {
+     try {
+       console.log('🔄 更新提示词，直接使用ID:', { id, data })
+       
+       // 直接使用完整ID获取文档
+       const doc = this.db.get(id)
+       
+       // ...验证逻辑不变
+
+       // 更新数据
+       const updatedData = {
+         // ...数据字段不变
+       }
+       
+       console.log('🔄 更新提示词数据:', { id, updatedData })
+       
+       // 直接使用完整ID进行保存
+       const result = this.db.put(id, updatedData)
+
+       // ...其余代码不变
+     }
+   }
+   ```
+
+3. **修复`createPrompt`方法**：
+   ```typescript
+   // 使用完整ID格式保存
+   const fullId = `prompt_manager_prompt_${id}`
+   const result = this.db.put(fullId, dataToSave)
+   
+   // 更新prompt对象的id为完整ID，以便返回给调用者
+   prompt.id = fullId
+   ```
+
+**验证方案**：
+- 创建新提示词，确认能正确保存
+- 编辑提示词，确认能正确更新
+- 删除提示词，确认能真正从数据库中删除并且页面更新
+
+**经验教训**：
+- ✅ **统一ID处理逻辑**：整个应用中使用一致的ID格式和处理方式
+- ✅ **简化ID处理**：直接使用完整ID，避免复杂的ID转换逻辑
+- ✅ **日志驱动调试**：通过详细日志跟踪数据流和操作结果
+- ✅ **全面修复**：发现一处ID处理问题后，检查所有相关方法
+
+**预防措施**：
+- 在数据层统一ID处理逻辑，避免在业务层进行ID转换
+- 添加单元测试验证ID处理逻辑的正确性
+- 在关键操作后添加验证步骤，确保操作真正成功
+
+---
+
 ### 开发最佳实践总结
 
 #### 🎯 数据层设计原则

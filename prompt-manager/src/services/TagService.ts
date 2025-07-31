@@ -105,21 +105,9 @@ export class TagService {
         updatedAt: new Date().toISOString()
       }
 
-      // 保存到数据库
-      let saveKey: string
-      if (id.startsWith('prompt_manager_tags_tag_')) {
-        saveKey = id
-      } else if (id.startsWith('tag_')) {
-        // 移除业务ID中的tag_前缀，然后构造完整ID
-        const cleanId = id.replace(/^tag_/, '')
-        saveKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`
-      } else {
-        // 纯时间戳ID，直接构造
-        saveKey = `${TagService.TAG_STORE_KEY}_tag_${id}`
-      }
-      
-      console.log('💾 准备保存更新的标签:', { inputId: id, saveKey, updatedTag })
-      const saveResult = this.db.put(saveKey, updatedTag)
+      // 保存到数据库 - 直接使用完整ID
+      console.log('💾 准备保存更新的标签:', { id, updatedTag })
+      const saveResult = this.db.put(id, updatedTag)
       console.log('💾 标签保存结果:', saveResult)
 
       // 检查保存是否成功 - 需要处理 uTools 数据库可能返回的不同格式
@@ -163,28 +151,16 @@ export class TagService {
       // 获取关联的提示词数量
       const affectedPrompts = await this.getPromptCountByTag(id)
 
-      // 构造正确的删除ID
-      let dbKey: string
-      if (id.startsWith('prompt_manager_tags_tag_')) {
-        dbKey = id
-      } else if (id.startsWith('tag_')) {
-        // 移除业务ID中的tag_前缀，然后构造完整ID
-        const cleanId = id.replace(/^tag_/, '')
-        dbKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`
-      } else {
-        // 纯时间戳ID，直接构造
-        dbKey = `${TagService.TAG_STORE_KEY}_tag_${id}`
-      }
-      
-      console.log('🗑️ 删除标签，ID构造:', { inputId: id, dbKey })
+      // 直接使用完整ID获取和删除文档
+      console.log('🗑️ 删除标签，直接使用ID:', { id })
       
       // 先获取完整文档，然后删除
-      const fullDoc = await this.db.get(dbKey)
+      const fullDoc = await this.db.get(id)
       if (fullDoc) {
         await this.db.remove(fullDoc)
-        console.log('✅ 标签删除成功:', dbKey)
+        console.log('✅ 标签删除成功:', id)
       } else {
-        console.log('⚠️ 标签文档不存在:', dbKey)
+        console.log('⚠️ 标签文档不存在:', id)
         return {
           success: false,
           affectedPrompts: 0,
@@ -258,23 +234,9 @@ export class TagService {
    */
   async getTagById(id: string): Promise<Tag | null> {
     try {
-      // 统一构造完整的数据库ID：prompt_manager_tags_tag_{业务ID}
-      // 如果传入的ID已经包含完整前缀，直接使用；否则构造
-      let dbKey: string
-      if (id.startsWith('prompt_manager_tags_tag_')) {
-        dbKey = id
-      } else if (id.startsWith('tag_')) {
-        // 移除业务ID中的tag_前缀，然后构造完整ID
-        const cleanId = id.replace(/^tag_/, '')
-        dbKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`
-      } else {
-        // 纯时间戳ID，直接构造
-        dbKey = `${TagService.TAG_STORE_KEY}_tag_${id}`
-      }
+      console.log('🔍 获取标签，直接使用ID:', { id })
       
-      console.log('🔍 获取标签，ID构造:', { inputId: id, dbKey })
-      
-      const tag = await this.db.get(dbKey)
+      const tag = await this.db.get(id)
       return tag || null
     } catch (error) {
       console.error('获取标签失败:', error)
@@ -295,7 +257,7 @@ export class TagService {
         // 进一步确保只处理标签数据
         .filter(tag => tag && tag._id && tag._id.includes('tag_'))
         .map(tag => ({
-          id: tag._id.replace(/^.*tag_/, ''), // 提取时间戳部分作为业务ID
+          id: tag._id, // 直接使用完整的数据库ID，不再截取
           name: tag.name || '',
           color: tag.color || 'default',
           description: tag.description || '',
