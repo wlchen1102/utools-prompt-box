@@ -1,7 +1,6 @@
 ---
 alwaysApply: false
 ---
-
 以下是utools的开发者文档，你需要一个一个阅读，确保能够完整理解utools的开发规范，这影响到我们整个项目的成败。我们的项目是做一个utools插件，必须符合utools的开发规范，否则无法发布到utools平台。
 # utools开发者文档：
 ## 基础文档：

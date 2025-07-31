@@ -1,0 +1,41 @@
+---
+description: 
+globs:
+alwaysApply: true
+---
+---
+alwaysApply: true
+---
+在我们的沟通以及开发代码时，你需要遵守以下原则：
+
+## 开发原则
+KISS (Keep It Simple, Stupid)
+ - Encourages Claude to write straightforward, uncomplicated solutions
+ - Avoids over-engineering and unnecessary complexity
+ - Results in more readable and maintainable code
+
+YAGNI (You Aren't Gonna Need It)
+ - Prevents Claude from adding speculative features
+ - Focuses on implementing only what's currently needed
+ - Reduces code bloat and maintenance overhead
+
+SOLID Principles
+ - Single Responsibility Principle
+ - Open-Closed Principle
+ - Liskov Substitution Principle
+ - Interface Segregation Principle
+ - Dependency Inversion Principle
+
+other:
+ - 仅修改与特定请求直接相关的代码。避免更改无关的功能。
+ - 切勿将代码替换为占位符，例如``// ...剩余的处理...''。始终包含完整的代码。
+ - 将问题分为较小的步骤。在实施之前单独考虑每个步骤。
+ - 在更改之前，请始终根据代码和日志的证据提供推理。
+ - 修改以后，要及时反思，是否真的能够解决问题。
+ - 代码添加必要的中文注释，便于我理解。
+
+## 沟通原则
+1、你要及时更新.cursor\rules\prompt-manager\tasks.md 文件，让我知道你完成了哪些任务。
+2、每一步做完都需要等我确认后，再执行下一步。
+3、我们的项目是使用utools做的插件。产品页面设计要参考utools默认窗口大小（1600*1088）。
+4、如果尝试2次依然无法解决问题，要主动搜索网络上相关问题的最佳实践取解决问题。

@@ -321,7 +321,8 @@ onActivated(async () => {
   await loadPrompts()
 })
 
-// 临时清理所有标签
+// 临时清理所有标签 - 已完成清理任务，注释掉
+/*
 const clearAllTags = () => {
   if (confirm('确定要清理所有重复的标签吗？这将删除所有标签，并重新加载所有提示词。')) {
     tagStore.clearAllTags()
@@ -329,6 +330,28 @@ const clearAllTags = () => {
     loadPrompts() // 重新加载所有提示词以确保标签关联正确
   }
 }
+*/
+
+// 临时清理脏数据 - 已完成清理任务，注释掉
+/*
+const cleanInvalidPrompts = async () => {
+  if (confirm('确定要清理所有无效的提示词数据吗？这将删除所有标题或内容为空的提示词。')) {
+    try {
+      const result = await promptService.cleanInvalidPrompts()
+      if (result.success) {
+        message.success(result.message)
+        await loadPrompts()
+      } else {
+        message.error(result.message || '清理无效提示词失败')
+        console.error('清理无效提示词失败:', result.message)
+      }
+    } catch (error) {
+      console.error('清理无效提示词失败:', error)
+      message.error('清理无效提示词失败')
+    }
+  }
+}
+*/
 </script>
 
 <template>
@@ -359,14 +382,23 @@ const clearAllTags = () => {
           添加提示词
         </button>
         
-        <!-- 临时清理按钮 -->
+        <!-- 临时清理按钮 - 已完成清理任务，注释掉 -->
+        <!-- 
         <button class="btn-danger" @click="clearAllTags" style="margin-left: 12px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <polyline points="3,6 5,6 21,6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
           清理所有标签
         </button>
+        
+        <button class="btn-warning" @click="cleanInvalidPrompts" style="margin-left: 12px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"></path>
+          </svg>
+          清理脏数据
+        </button>
+        -->
       </div>
     </div>
 
@@ -574,6 +606,8 @@ const clearAllTags = () => {
   box-shadow: 0 4px 12px rgba(0, 178, 90, 0.4);
 }
 
+/* 临时清理按钮样式 - 已完成清理任务，注释掉 */
+/*
 .btn-danger {
   display: flex;
   align-items: center;
@@ -595,6 +629,29 @@ const clearAllTags = () => {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
 }
+
+.btn-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ff9f43;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 159, 67, 0.3);
+}
+
+.btn-warning:hover {
+  background: #ee5253;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 159, 67, 0.4);
+}
+*/
 
 .main-content {
   flex: 1;

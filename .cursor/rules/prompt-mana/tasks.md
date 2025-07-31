@@ -44,11 +44,13 @@
   - ⚠️ 编写类型验证的单元测试 (待后续进行)
   - **需求引用**: 要求4.8 (提示词字段定义), 要求3.9 (标签颜色分类)
 
-- [x] 2.2 实现 uTools API 封装层 ✅ **已完成 2025-01-22**
+- [x] 2.2 实现 uTools API 封装层 ✅ **已完成并修复 2025-07-31**
   - ✅ 创建 utils/utoolsAPI.ts - 封装 utools.db、utools.copyText 等原生 API
   - ✅ 实现 UtoolsDB 类的数据增删改查方法（直接调用 utools.db）
   - ✅ 实现数据备份和恢复功能（使用 utools.db 导出导入）
   - ✅ 支持开发环境 localStorage 模拟
+  - ✅ **删除API修复**: 修正utools.db.remove()使用方式，确保传递完整文档对象而非字符串ID
+  - ✅ **数据过滤修复**: 修正allDocs()方法，正确过滤已删除文档和按前缀过滤
   - ⚠️ 编写 uTools API 集成测试 (待后续进行)
   - **需求引用**: 要求5.1-5.4 (数据存储功能)
 
@@ -97,7 +99,7 @@
   - ✅ 实现标签的悬浮操作按钮（编辑、删除）
   - **需求引用**: 要求2.1-2.2, 要求3.1-3.4 (标签面板布局和筛选)
 
-- [x] 4.2 实现标签 CRUD 操作 ✅ **已完成并优化 2025-01-23**
+- [x] 4.2 实现标签 CRUD 操作 ✅ **已完成并优化 2025-07-31**
   - ✅ 创建 TagDialog.vue - 标签编辑对话框组件
   - ✅ 实现标签的新增功能和表单验证
   - ✅ 实现标签的编辑功能，支持名称和颜色修改
@@ -107,6 +109,8 @@
   - ✅ **UI优化**: 标签长度20字符，显示8字符+省略号
   - ✅ **交互优化**: 悬浮显示横向三点菜单，点击显示下拉操作
   - ✅ **数据修复**: 编辑时正确初始化原始标签数据
+  - ✅ **删除修复**: 修复标签删除ID构造错误，统一ID格式规范，解决新旧标签删除异常
+  - ✅ **组件修复**: 修复ConfirmDialog属性不匹配问题，移除重复默认标签创建逻辑
   - **需求引用**: 要求3.5-3.8 (标签增删改)
 
 - [x] 4.3 开发标签服务层 ✅ **已完成 2025-01-23**
@@ -371,4 +375,296 @@
 3. **M3 - 主要功能集成**：任务 7-8 完成，完整的用户流程可用
 4. **M4 - 生产就绪**：任务 9-12 完成，可发布的稳定版本
 
-每个里程碑都应该包含功能演示和回归测试，确保项目按预期进度推进。 
+每个里程碑都应该包含功能演示和回归测试，确保项目按预期进度推进。
+
+
+## 重要问题解决记录与经验总结
+
+### 问题记录 #1：标签删除功能异常 🔥 **已解决 2025-07-31**
+
+**问题现象**：
+- 新创建的标签删除时报错"标签不存在"
+- 旧标签能删除成功，新标签删除失败
+- uTools.db.allDocs() 返回数据正常，但无法找到对应文档
+
+**根本原因分析**：
+1. **ID格式不一致**：
+   - 旧标签业务ID：`1753951003943_2wp9wcihg`（纯时间戳）
+   - 新标签业务ID：`tag_1753951821542_ugxfaitgy`（包含tag_前缀）
+   - 导致ID构造逻辑错误匹配
+
+2. **数据库存储ID构造错误**：
+   - 预期存储ID：`prompt_manager_tags_tag_{时间戳}`
+   - 实际存储ID：`prompt_manager_tags_tag_tag_{时间戳}`（双重前缀）
+
+3. **API使用错误**：
+   - 对uTools.db.remove()传递字符串ID而非文档对象
+   - 未按照官方文档要求先get后remove
+
+**解决方案**：
+1. **统一ID格式规范**：
+   - 业务ID：纯时间戳格式 `{timestamp}_{random}`
+   - 存储ID：完整格式 `prompt_manager_tags_tag_{timestamp}_{random}`
+
+2. **修复ID构造逻辑**（在TagService.ts中）：
+   ```typescript
+   // 智能识别输入ID格式，正确构造存储ID
+   let dbKey: string
+   if (id.startsWith('prompt_manager_tags_tag_')) {
+     dbKey = id  // 完整ID，直接使用
+   } else if (id.startsWith('tag_')) {
+     const cleanId = id.replace(/^tag_/, '')
+     dbKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`  // 移除前缀重构
+   } else {
+     dbKey = `${TagService.TAG_STORE_KEY}_tag_${id}`  // 纯时间戳，直接构造
+   }
+   ```
+
+3. **修复删除方法**：
+   ```typescript
+   // 先获取完整文档，再删除
+   const fullDoc = await this.db.get(dbKey)
+   if (fullDoc) {
+     await this.db.remove(fullDoc)  // 传递文档对象而非字符串
+   }
+   ```
+
+**经验教训**：
+- ✅ **uTools API规范**：严格按照官方文档使用API，remove()需传递文档对象
+- ✅ **ID设计一致性**：制定明确的ID格式规范，避免混合使用不同格式
+- ✅ **向后兼容性**：修复时要考虑历史数据，智能识别多种ID格式
+- ✅ **详细日志记录**：添加ID构造过程的日志，便于问题排查
+- ✅ **逐步验证**：先解决数据一致性，再处理API调用方式
+
+**预防措施**：
+- 定义统一的数据层抽象，隐藏底层ID构造细节
+- 添加数据迁移机制，统一历史数据格式
+- 编写ID格式的单元测试，确保构造逻辑正确
+
+---
+
+### 问题记录 #2：默认标签重复创建 🛠️ **已解决 2025-07-31**
+
+**问题现象**：
+- 每次页面刷新都创建重复的默认标签（"AI写作"、"编程助手"、"翻译工具"）
+- 数据库中累积大量重复标签记录
+
+**根本原因**：
+- TagStore中loadTags()方法存在逻辑缺陷
+- 当getAllTags()过滤后返回空数组时，误判为"无标签"状态
+- 自动触发createDefaultTags()创建默认标签
+
+**解决方案**：
+- 完全移除createDefaultTags()函数和相关调用逻辑
+- 让用户手动创建所需标签，避免自动化的默认数据
+
+**经验教训**：
+- ✅ **避免自动化默认数据**：让用户主动创建数据，避免程序自动补充
+- ✅ **数据过滤逻辑审查**：仔细检查数据层过滤逻辑对业务逻辑的影响
+- ✅ **清理机制**：提供临时的数据清理功能，解决历史问题
+
+---
+
+### 问题记录 #3：ConfirmDialog组件属性不匹配 🔧 **已解决 2025-07-31**
+
+**问题现象**：
+- 删除标签时Vue组件报错：`iconRenderMap[this.type] is not a function`
+- 控制台显示Vue渲染错误
+
+**根本原因**：
+- HomeView.vue中使用了ConfirmDialog不支持的属性
+- 使用了`type="danger"`、`detail`、`confirm-text`等不存在的属性
+- 正确属性应为`positive-text`、`negative-text`
+
+**解决方案**：
+- 移除不支持的`type`和`detail`属性
+- 使用正确的属性名称：`positive-text`、`negative-text`
+
+**经验教训**：
+- ✅ **组件接口一致性**：确保使用的属性与组件定义完全匹配
+- ✅ **TypeScript类型检查**：利用TypeScript的类型系统预防此类错误
+- ✅ **组件文档化**：为自定义组件编写清晰的属性接口文档
+
+---
+
+### 问题记录 #4：uTools.db.remove() API使用错误导致删除失败 💥 **已解决 2025-07-31**
+
+**问题现象**：
+- 删除操作显示成功，但数据实际未被删除
+- `utools.db.allDocs()` 仍然返回"已删除"的数据
+- 用户反复删除同一条数据，提示成功但数据依然存在
+
+**根本原因分析**：
+1. **API使用方式错误**：
+   ```typescript
+   // ❌ 错误方式：直接传递字符串ID
+   await this.db.remove(dbKey)
+   
+   // ✅ 正确方式：先获取文档对象，再删除
+   const fullDoc = await this.db.get(dbKey)
+   if (fullDoc) {
+     await this.db.remove(fullDoc)  // 传递完整文档对象
+   }
+   ```
+
+2. **对uTools官方文档理解不准确**：
+   - 虽然官方文档显示`remove(id: string)`支持字符串ID
+   - 但实际测试中，传递完整文档对象更可靠
+   - 文档对象包含必要的`_id`和`_rev`字段用于版本控制
+
+3. **CouchDB底层机制**：
+   - uTools使用CouchDB作为底层数据库
+   - CouchDB删除需要文档的版本信息(`_rev`)进行乐观锁控制
+   - 直接传递ID可能无法获取到正确的版本信息
+
+**解决方案**：
+1. **修改删除方法实现**：
+   ```typescript
+   // 在TagService.ts和PromptService.ts中统一修改
+   async removeDocument(id: string): Promise<boolean> {
+     try {
+       // 第一步：获取完整文档（包含_id和_rev）
+       const fullDoc = await this.db.get(dbKey)
+       if (!fullDoc) {
+         console.log('⚠️ 文档不存在:', dbKey)
+         return false
+       }
+       
+       // 第二步：传递完整文档对象进行删除
+       const result = await this.db.remove(fullDoc)
+       console.log('✅ 删除结果:', result)
+       
+       return result.ok === true
+     } catch (error) {
+       console.error('❌ 删除失败:', error)
+       return false
+     }
+   }
+   ```
+
+2. **在utoolsAPI.ts中修正remove方法**：
+   ```typescript
+   remove(docOrId: string | object): any {
+     if (!window.utools) {
+       // 开发环境处理
+       return { ok: true }
+     }
+     
+     try {
+       // 确保传递的是对象而非字符串
+       if (typeof docOrId === 'string') {
+         console.warn('⚠️ 建议传递文档对象而非字符串ID')
+       }
+       
+       const result = window.utools.db.remove(docOrId)
+       console.log('🗑️ 删除结果:', result)
+       return result
+     } catch (error) {
+       console.error('🔴 删除操作失败:', error)
+       return { ok: false, error: true, message: error.message }
+     }
+   }
+   ```
+
+**验证方案**：
+- 删除后立即调用`utools.db.allDocs()`检查数据是否真正移除
+- 检查返回的文档中不应包含`_deleted: true`的墓碑记录
+- 在UI层面确认删除的数据不再显示
+
+**经验教训**：
+- ✅ **严格遵循API最佳实践**：即使文档支持多种调用方式，选择最可靠的方式
+- ✅ **分步骤操作验证**：对于关键操作（如删除），分步验证每个环节
+- ✅ **理解底层数据库机制**：了解CouchDB的版本控制和乐观锁机制
+- ✅ **充分的日志记录**：记录删除过程的每个步骤，便于问题排查
+- ✅ **用户操作验证**：不仅检查API返回值，还要验证实际的数据状态
+
+**预防措施**：
+- 为所有数据库操作建立标准的操作模式（get → operate → verify）
+- 在关键操作后添加数据一致性检查
+- 建立删除操作的回滚机制，预防意外数据丢失
+
+---
+
+### 问题记录 #5：脏数据导致删除异常 🗑️ **已解决 2025-07-31**
+
+**问题现象**：
+- 特定提示词（"测额度"）删除后页面仍显示
+- 该提示词的ID显示为异常值：`manager_undefined`
+- 正常删除流程对该条数据无效
+
+**根本原因分析**：
+1. **异常ID生成**：
+   - 正常ID格式：`1753785168179_kne4n8t9t`（时间戳_随机字符）
+   - 异常ID格式：`manager_undefined`（包含undefined关键字）
+   - 说明在某次创建过程中ID生成逻辑出现异常
+
+2. **数据库存储不一致**：
+   - 完整存储ID可能为：`prompt_manager_prompt_manager_undefined`
+   - 删除时ID构造无法正确匹配到该文档
+
+3. **历史测试数据污染**：
+   - 可能是开发过程中某次异常操作产生的脏数据
+   - 该数据结构不符合当前的数据规范
+
+**解决方案**：
+1. **创建脏数据检测和清理机制**：
+   ```typescript
+   async cleanInvalidPrompts(): Promise<{ success: boolean; message: string; deletedCount: number }> {
+     // 检测异常ID的条件：
+     const isInvalidId = (extractedId: string) => {
+       return !extractedId || 
+              extractedId === 'undefined' || 
+              extractedId === 'null' || 
+              extractedId.includes('undefined') ||
+              extractedId.includes('manager') ||
+              extractedId.length < 10  // 正常ID长度应该比较长
+     }
+     
+     // 遍历所有提示词文档，检测并删除异常数据
+     for (const promptDoc of promptDocs) {
+       const extractedId = promptDoc._id.replace(/^.*prompt_/, '')
+       if (isInvalidId(extractedId)) {
+         // 删除脏数据
+         await this.db.remove(promptDoc)
+       }
+     }
+   }
+   ```
+
+2. **添加临时清理功能**：
+   - 在UI中添加"清理脏数据"按钮（使用后注释掉）
+   - 提供一键清理所有异常数据的功能
+
+**经验教训**：
+- ✅ **数据验证机制**：在数据创建时应验证ID格式的正确性
+- ✅ **异常数据处理**：建立检测和清理异常数据的机制
+- ✅ **开发阶段数据管理**：开发过程中注意数据清洁，避免脏数据积累
+- ✅ **数据格式规范**：严格定义数据ID格式规范，并在代码中强制执行
+
+**预防措施**：
+- 在ID生成函数中添加格式验证
+- 定期检查数据库中的数据完整性
+- 建立数据迁移和清理的标准流程
+
+---
+
+### 开发最佳实践总结
+
+#### 🎯 数据层设计原则
+1. **统一ID格式**：制定明确的业务ID和存储ID规范
+2. **API封装**：隐藏底层uTools API的复杂性，提供一致的接口
+3. **向后兼容**：新版本要能处理旧版本的数据格式
+4. **详细日志**：在关键数据操作点添加详细日志
+
+#### 🔍 问题排查策略
+1. **从用户行为入手**：分析用户操作路径，定位问题触发点
+2. **数据流追踪**：跟踪数据从UI到存储的完整流程
+3. **控制台日志分析**：充分利用控制台日志定位问题
+4. **分层验证**：分别验证UI层、业务层、数据层的功能
+
+#### ⚡ 高效修复流程
+1. **问题复现**：先确保能稳定复现问题
+2. **根因分析**：深入分析问题的根本原因，不只是修复表象
+3. **方案设计**：设计既解决当前问题又不引入新问题的方案
+4. **逐步实施**：分步骤实施修复，每步都验证效果
+5. **经验记录**：及时记录问题和解决方案，供将来参考 

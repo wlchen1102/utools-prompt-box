@@ -42,8 +42,7 @@ export class PromptService {
           usageCount: doc.usageCount || 0,
           isFavorite: doc.isFavorite || false,
           createdAt: doc.createdAt || new Date().toISOString(),
-          updatedAt: doc.updatedAt || new Date().toISOString(),
-          _rev: doc._rev // 保留_rev以备后用
+          updatedAt: doc.updatedAt || new Date().toISOString()
         }))
         .filter((prompt: Prompt) => prompt.title && prompt.title.trim()) // 只过滤无效数据
         .sort((a: Prompt, b: Prompt) => 
@@ -68,7 +67,7 @@ export class PromptService {
       if (!doc) {
         doc = this.db.get(`prompt_manager_prompt_${id}`)
       }
-      if (!doc || doc.isDeleted) {
+      if (!doc) {
         return null
       }
 
@@ -87,8 +86,7 @@ export class PromptService {
         usageCount: doc.usageCount || 0,
         isFavorite: doc.isFavorite || false,
         createdAt: doc.createdAt || new Date().toISOString(),
-        updatedAt: doc.updatedAt || new Date().toISOString(),
-        isDeleted: doc.isDeleted || false
+        updatedAt: doc.updatedAt || new Date().toISOString()
       }
     } catch (error) {
       console.error(`获取提示词 ${id} 失败:`, error)
@@ -295,8 +293,7 @@ export class PromptService {
         usageCount: Number(data.usageCount || 0),
         isFavorite: Boolean(data.isFavorite || false),
         createdAt: String(doc.createdAt || new Date().toISOString()),
-        updatedAt: new Date().toISOString(),
-        isDeleted: doc.isDeleted || false
+        updatedAt: new Date().toISOString()
       }
       
       // 使用原始文档的 _id 进行保存，但需要去掉前缀避免重复
@@ -314,8 +311,7 @@ export class PromptService {
           usageCount: updatedData.usageCount || 0,
           isFavorite: updatedData.isFavorite || false,
           createdAt: updatedData.createdAt,
-          updatedAt: updatedData.updatedAt,
-          isDeleted: updatedData.isDeleted
+          updatedAt: updatedData.updatedAt
         }
         
         console.log('提示词更新成功:', updated)
@@ -532,6 +528,64 @@ export class PromptService {
       succeeded,
       failed: errors.length,
       errors
+    }
+  }
+
+  /**
+   * 清理异常提示词数据（临时方法，用于解决脏数据问题）
+   */
+  async cleanInvalidPrompts(): Promise<{ success: boolean; message: string; deletedCount: number }> {
+    try {
+      console.log('🧹 开始清理异常提示词数据...')
+      
+      const allDocs = this.db.allDocs()
+      const promptDocs = allDocs.filter(doc => doc && doc._id && doc._id.includes('prompt_'))
+      
+      console.log(`找到 ${promptDocs.length} 个提示词文档，检查异常数据...`)
+      
+      let deletedCount = 0
+      for (const promptDoc of promptDocs) {
+        try {
+          // 检查是否是异常ID
+          const extractedId = promptDoc._id.replace(/^.*prompt_/, '')
+          
+          // 检查ID是否异常（包含undefined、null等）
+          if (!extractedId || 
+              extractedId === 'undefined' || 
+              extractedId === 'null' || 
+              extractedId.includes('undefined') ||
+              extractedId.includes('manager') ||
+              extractedId.length < 10) { // 正常ID应该是时间戳+随机字符，长度会比较长
+            
+            console.log(`🔍 发现异常提示词: ${promptDoc.title} (ID: ${extractedId}, 完整ID: ${promptDoc._id})`)
+            
+            const result = this.db.remove(promptDoc)
+            if (result.ok) {
+              deletedCount++
+              console.log(`✅ 已删除异常提示词: ${promptDoc.title}`)
+            } else {
+              console.error(`❌ 删除异常提示词失败: ${promptDoc.title}`, result)
+            }
+          }
+        } catch (error) {
+          console.error(`❌ 处理提示词时出错: ${promptDoc.title}`, error)
+        }
+      }
+      
+      console.log(`🧹 清理完成，共删除 ${deletedCount} 个异常提示词`)
+      
+      return {
+        success: true,
+        message: `清理完成，共删除 ${deletedCount} 个异常提示词`,
+        deletedCount
+      }
+    } catch (error) {
+      console.error('清理异常提示词失败:', error)
+      return {
+        success: false,
+        message: '清理异常提示词失败',
+        deletedCount: 0
+      }
     }
   }
 }
