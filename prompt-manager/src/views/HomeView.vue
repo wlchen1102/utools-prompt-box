@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 import type { Prompt } from '@/types/Prompt'
 import type { Tag, CreateTagDTO, UpdateTagDTO } from '@/types/Tag'
 import { TAG_COLOR_CONFIGS } from '@/types/Tag'
+import { useMessage } from 'naive-ui'
 import TagPanel from '@/components/TagPanel.vue'
 import TagDialog from '@/components/TagDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -15,6 +16,7 @@ import { promptService } from '@/services/PromptService'
 
 // 使用 store
 const tagStore = useTagStore()
+const message = useMessage()
 
 // 响应式数据
 const searchKeyword = ref('')
@@ -28,6 +30,8 @@ const tagDialogMode = ref<'create' | 'edit'>('create')
 const editingTag = ref<Tag | null>(null)
 const confirmDialogVisible = ref(false)
 const deletingTag = ref<Tag | null>(null)
+const deletingPrompt = ref<Prompt | null>(null)
+const promptDeleteDialogVisible = ref(false)
 
 // 提示词查看弹窗状态
 const promptViewDialogVisible = ref(false)
@@ -258,16 +262,30 @@ const editPrompt = (prompt: Prompt) => {
 }
 
 const deletePrompt = async (prompt: Prompt) => {
-  const result = await promptService.deletePrompt(prompt.id)
+  console.log('🗑️ 删除按钮被点击:', prompt)
+  deletingPrompt.value = prompt
+  promptDeleteDialogVisible.value = true
+}
+
+const confirmDeletePrompt = async () => {
+  if (!deletingPrompt.value) return
+  
+  console.log('🗑️ 开始删除提示词:', deletingPrompt.value)
+  
+  const result = await promptService.removePrompt(deletingPrompt.value.id)
+  console.log('🗑️ 删除操作结果:', result)
+  
   if (result.success) {
-    const index = prompts.value.findIndex(p => p.id === prompt.id)
-    if (index !== -1) {
-      prompts.value.splice(index, 1)
-    }
-    console.log('提示词删除成功:', prompt)
+    // 重新从数据库加载数据，确保数据一致性
+    await loadPrompts()
+    message.success('提示词删除成功')
+    console.log('提示词删除成功:', deletingPrompt.value)
   } else {
+    message.error(result.error || '删除提示词失败')
     console.error('删除提示词失败:', result.error)
   }
+  
+  deletingPrompt.value = null
 }
 
 // 加载提示词数据
@@ -302,6 +320,15 @@ onActivated(async () => {
   // 重新加载提示词数据
   await loadPrompts()
 })
+
+// 临时清理所有标签
+const clearAllTags = () => {
+  if (confirm('确定要清理所有重复的标签吗？这将删除所有标签，并重新加载所有提示词。')) {
+    tagStore.clearAllTags()
+    message.success('所有重复标签已清理')
+    loadPrompts() // 重新加载所有提示词以确保标签关联正确
+  }
+}
 </script>
 
 <template>
@@ -330,6 +357,15 @@ onActivated(async () => {
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
           添加提示词
+        </button>
+        
+        <!-- 临时清理按钮 -->
+        <button class="btn-danger" @click="clearAllTags" style="margin-left: 12px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <polyline points="3,6 5,6 21,6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path>
+          </svg>
+          清理所有标签
         </button>
       </div>
     </div>
@@ -434,16 +470,24 @@ onActivated(async () => {
       @confirm="handleTagDialogConfirm"
     />
 
-    <!-- 删除确认对话框 -->
+    <!-- 删除标签确认对话框 -->
     <ConfirmDialog
       v-model:visible="confirmDialogVisible"
       title="删除标签"
       :message="`确定要删除标签「${deletingTag?.name}」吗？`"
-      :detail="`删除后，关联此标签的 ${deletingTag ? getTagPromptCount(deletingTag.id) : 0} 个提示词将移除此标签关联，但提示词本身不会被删除。`"
-      confirm-text="删除"
-      cancel-text="取消"
-      type="danger"
+      positive-text="删除"
+      negative-text="取消"
       @confirm="handleTagDeleteConfirm"
+    />
+
+    <!-- 删除提示词确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="promptDeleteDialogVisible"
+      title="删除提示词"
+      :message="`确定要删除提示词「${deletingPrompt?.title}」吗？`"
+      positive-text="删除"
+      negative-text="取消"
+      @confirm="confirmDeletePrompt"
     />
 
     <!-- 提示词查看弹窗 -->
@@ -528,6 +572,28 @@ onActivated(async () => {
   background: #00a555;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 178, 90, 0.4);
+}
+
+.btn-danger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ff4757;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
+}
+
+.btn-danger:hover {
+  background: #ff3347;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
 }
 
 .main-content {

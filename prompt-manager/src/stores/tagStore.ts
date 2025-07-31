@@ -45,33 +45,12 @@ export const useTagStore = defineStore('tag', () => {
       
       console.log('✅ Store 中的标签已更新为:', tags.value.map(t => ({ id: t.id, name: t.name })))
       
-      // 如果没有标签数据，创建默认标签
-      if (loadedTags.length === 0) {
-        console.log('🔧 没有找到已保存的标签，创建默认标签...')
-        await createDefaultTags()
-      }
-      
       return tags.value
     } catch (error) {
-      console.error('❌ 加载标签数据失败:', error)
+      console.error('加载标签失败:', error)
       return []
     } finally {
       isLoading.value = false
-    }
-  }
-
-  const createDefaultTags = async () => {
-    const defaultTags = [
-      { name: 'AI写作', color: 'primary' as const, description: 'AI协助写作相关的提示词' },
-      { name: '编程助手', color: 'info' as const, description: '编程开发相关的提示词' },
-      { name: '翻译工具', color: 'success' as const, description: '语言翻译相关的提示词' }
-    ]
-    
-    for (const tagData of defaultTags) {
-      const result = await tagService.createTag(tagData)
-      if (result.success && result.data) {
-        tags.value.push(result.data)
-      }
     }
   }
 
@@ -172,6 +151,29 @@ export const useTagStore = defineStore('tag', () => {
     selectedTag.value = null
   }
 
+  // 临时清理方法
+  const clearAllTags = async () => {
+    try {
+      const result = await tagService.clearAllTags()
+      if (result.success) {
+        // 清空 store 状态
+        resetState()
+        console.log(result.message)
+        return result
+      } else {
+        console.error('清理失败:', result.message)
+        return result
+      }
+    } catch (error) {
+      console.error('清理标签失败:', error)
+      return {
+        success: false,
+        message: '清理标签失败',
+        deletedCount: 0
+      }
+    }
+  }
+
   return {
     // 状态
     tags,
@@ -190,6 +192,7 @@ export const useTagStore = defineStore('tag', () => {
     deleteTag,
     getTagById,
     selectTag,
-    resetState
+    resetState,
+    clearAllTags
   }
 }) 

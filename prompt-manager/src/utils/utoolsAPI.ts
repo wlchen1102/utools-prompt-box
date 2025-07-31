@@ -5,7 +5,13 @@
 
 // 检查是否在 uTools 环境中
 export const isUToolsEnv = (): boolean => {
-  return typeof window !== 'undefined' && typeof window.utools !== 'undefined'
+  const result = typeof window !== 'undefined' && typeof window.utools !== 'undefined'
+  console.log('🔍 环境检查:', { 
+    hasWindow: typeof window !== 'undefined', 
+    hasUtools: typeof window !== 'undefined' && typeof window.utools !== 'undefined',
+    isUToolsEnv: result 
+  })
+  return result
 }
 
 // 数据库操作类
@@ -67,62 +73,61 @@ export class UtoolsDB {
       return result
     }
 
+    console.log('📖 准备获取文档:', this.getKey(id))
     const doc = window.utools.db.get(this.getKey(id))
-    if (!doc) return null
-    
-    // 过滤掉 uTools 内部字段，返回业务数据
-    const { _id, _rev, updatedAt, ...businessData } = doc
-    console.log('📖 从 uTools 数据库读取数据:', { id, doc, businessData })
-    return businessData as T
+    console.log('📖 从 uTools 数据库读取数据:', { id, doc })
+    return doc as T
   }
 
   /**
-   * 删除数据
+   * 物理删除一个文档
+   * @param docOrId 文档对象或文档ID
    */
-  remove(id: string): { ok: boolean; id: string; rev: string } {
-    if (!isUToolsEnv()) {
-      // 开发环境使用 localStorage 模拟
-      localStorage.removeItem(this.getKey(id))
-      return { ok: true, id, rev: Date.now().toString() }
+  remove(docOrId: string | any): { ok: boolean; error?: boolean; message?: string } {
+    if (!window.utools) {
+      console.warn('uTools API 在浏览器环境中不可用。')
+      return { ok: true } // 在开发环境中模拟成功
     }
-
-    return window.utools.db.remove(this.getKey(id))
+    try {
+      console.log('🗑️ 准备删除文档:', docOrId)
+      const result = window.utools.db.remove(docOrId)
+      console.log('🗑️ 删除结果:', result)
+      return result
+    } catch (error) {
+      console.error('🔴 uToolsDB.remove 失败:', { docOrId, error })
+      return { ok: false, error: true, message: String(error) }
+    }
   }
 
   /**
    * 获取所有文档
    */
-  allDocs<T = any>(): T[] {
-    if (!isUToolsEnv()) {
-      // 开发环境使用 localStorage 模拟
-      const keys = Object.keys(localStorage).filter(key => key.startsWith(this.dbPrefix))
-      console.log('🔍 localStorage 中所有匹配的键:', keys)
-      
-      const results = keys.map(key => {
-        const data = localStorage.getItem(key)
-        return data ? JSON.parse(data) : null
-      }).filter(Boolean)
-      
-      console.log('📦 allDocs 返回的数据:', results)
-      return results
+  allDocs(idPrefix?: string): any[] {
+    if (!window.utools) {
+      console.warn('uTools API 在浏览器环境中不可用。')
+      return []
     }
-
     try {
-      // 使用正确的 uTools API 获取所有文档
-      const docs = window.utools.db.allDocs(`${this.dbPrefix}`)
+      // uTools 的 allDocs 不接受前缀参数，总是获取所有文档
+      let docs = window.utools.db.allDocs()
       console.log('uTools.db.allDocs 返回:', docs)
-      
-      return docs.map(doc => {
-        // 过滤掉 uTools 内部字段，返回业务数据
-        const rawDoc = doc.data || doc.value || doc
-        if (!rawDoc) return null
-        
-        // 保留 _id 字段，因为 PromptService 需要它来过滤和提取ID
-        const { _rev, ...businessData } = rawDoc
-        return businessData
-      }).filter(Boolean)
+
+      // 过滤掉已删除的文档 (墓碑记录)
+      docs = docs.filter((doc) => !doc._deleted)
+
+      // 如果指定了前缀，在应用层进行过滤
+      if (idPrefix) {
+        docs = docs.filter((doc) => doc._id && doc._id.includes(idPrefix))
+      }
+
+      // uTools 返回的文档结构是完整的文档对象，不需要从 doc.data 中提取
+      return docs.map((doc: any) => {
+        // 直接返回完整的文档对象，确保包含所有字段
+        console.log('📦 allDocs 处理单个文档:', { original: doc })
+        return doc
+      })
     } catch (error) {
-      console.error('获取所有文档失败:', error)
+      console.error('🔴 uToolsDB.allDocs 失败:', error)
       return []
     }
   }

@@ -22,7 +22,7 @@ interface UTools {
   db: {
     put: (doc: { _id: string; [key: string]: any }) => { ok: boolean; id: string; rev: string }
     get: (id: string) => any
-    remove: (id: string) => { ok: boolean; id: string; rev: string }
+    remove: (docOrId: string | { _id: string; _rev: string }) => { ok: boolean; id: string; rev: string }
     bulkDocs: (docs: any[]) => any[]
     allDocs: (key?: string) => any[]
   }

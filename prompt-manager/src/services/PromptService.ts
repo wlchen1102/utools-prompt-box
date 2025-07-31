@@ -29,6 +29,8 @@ export class PromptService {
   async getAllPrompts(): Promise<Prompt[]> {
     try {
       const docs = this.db.allDocs()
+      console.log('📖 从 uTools 数据库读取数据:', docs)
+      
       const prompts = docs
         .filter((doc: any) => doc && doc._id && doc._id.includes('prompt_')) // 只处理提示词数据
         .map((doc: any) => ({
@@ -37,16 +39,18 @@ export class PromptService {
           content: doc.content || '',
           tags: doc.tags || [],
           source: doc.source || '',
+          usageCount: doc.usageCount || 0,
+          isFavorite: doc.isFavorite || false,
           createdAt: doc.createdAt || new Date().toISOString(),
           updatedAt: doc.updatedAt || new Date().toISOString(),
-          isDeleted: doc.isDeleted || false
+          _rev: doc._rev // 保留_rev以备后用
         }))
-        .filter((prompt: Prompt) => !prompt.isDeleted && prompt.title.trim()) // 过滤软删除和无效数据
+        .filter((prompt: Prompt) => prompt.title && prompt.title.trim()) // 只过滤无效数据
         .sort((a: Prompt, b: Prompt) => 
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         )
 
-      console.log('PromptService.getAllPrompts 返回:', prompts)
+      console.log('✅ PromptService.getAllPrompts 返回:', prompts)
       return prompts
     } catch (error) {
       console.error('获取提示词失败:', error)
@@ -68,14 +72,22 @@ export class PromptService {
         return null
       }
 
+      // 确保 doc._id 存在
+      if (!doc._id) {
+        console.error(`提示词 ${id} 缺少 _id 字段:`, doc)
+        return null
+      }
+
       return {
         id: doc._id.replace(/^.*prompt_/, ''),
-        title: doc.title,
-        content: doc.content,
+        title: doc.title || '',
+        content: doc.content || '',
         tags: doc.tags || [],
-        source: doc.source,
-        createdAt: doc.createdAt,
-        updatedAt: doc.updatedAt,
+        source: doc.source || '',
+        usageCount: doc.usageCount || 0,
+        isFavorite: doc.isFavorite || false,
+        createdAt: doc.createdAt || new Date().toISOString(),
+        updatedAt: doc.updatedAt || new Date().toISOString(),
         isDeleted: doc.isDeleted || false
       }
     } catch (error) {
@@ -185,6 +197,8 @@ export class PromptService {
         content: data.content,
         tags: data.tags || [],
         source: data.source,
+        usageCount: 0,
+        isFavorite: false,
         createdAt: now,
         updatedAt: now
       }
@@ -209,6 +223,8 @@ export class PromptService {
         content: String(prompt.content || ''),
         tags: Array.isArray(prompt.tags) ? prompt.tags.map(tag => String(tag)) : [],
         source: String(prompt.source || ''),
+        usageCount: Number(prompt.usageCount || 0),
+        isFavorite: Boolean(prompt.isFavorite || false),
         createdAt: String(prompt.createdAt),
         updatedAt: String(prompt.updatedAt)
       }
@@ -243,51 +259,65 @@ export class PromptService {
    */
   async updatePrompt(id: string, data: UpdatePromptDTO): Promise<PromptOperationResult> {
     try {
-      // 获取现有提示词
-      const existing = await this.getPromptById(id)
-      if (!existing) {
+      // 先尝试直接获取原始文档
+      let doc = this.db.get(`prompt_${id}`)
+      if (!doc) {
+        doc = this.db.get(`prompt_manager_prompt_${id}`)
+      }
+      
+      if (!doc) {
         return {
           success: false,
           error: '提示词不存在'
         }
       }
 
-      // 更新数据
-      const updated: Prompt = {
-        ...existing,
-        ...data,
-        id: existing.id, // 确保ID不被覆盖
-        createdAt: existing.createdAt, // 确保创建时间不被覆盖
-        updatedAt: new Date().toISOString()
-      }
-
       // 基础验证
-      if (!updated.title.trim()) {
+      if (!data.title?.trim()) {
         return {
           success: false,
           error: '提示词标题不能为空'
         }
       }
-      if (!updated.content.trim()) {
+      if (!data.content?.trim()) {
         return {
           success: false,
           error: '提示词内容不能为空'
         }
       }
 
-      // 保存到数据库 - 确保数据可序列化
-      const dataToSave = {
-        title: String(updated.title || ''),
-        content: String(updated.content || ''),
-        tags: Array.isArray(updated.tags) ? updated.tags.map(tag => String(tag)) : [],
-        source: String(updated.source || ''),
-        createdAt: String(updated.createdAt),
-        updatedAt: String(updated.updatedAt)
+      // 更新数据
+      const updatedData = {
+        title: String(data.title || ''),
+        content: String(data.content || ''),
+        tags: Array.isArray(data.tags) ? data.tags.map((tag: any) => String(tag)) : (doc.tags || []),
+        source: String(data.source || ''),
+        usageCount: Number(data.usageCount || 0),
+        isFavorite: Boolean(data.isFavorite || false),
+        createdAt: String(doc.createdAt || new Date().toISOString()),
+        updatedAt: new Date().toISOString(),
+        isDeleted: doc.isDeleted || false
       }
       
-      const result = this.db.put(`prompt_${id}`, dataToSave)
+      // 使用原始文档的 _id 进行保存，但需要去掉前缀避免重复
+      const cleanId = doc._id.replace(/^prompt_manager_/, '')
+      const result = this.db.put(cleanId, updatedData)
 
       if (result.ok) {
+        // 构建返回的提示词对象
+        const updated: Prompt = {
+          id: doc._id.replace(/^.*prompt_/, ''),
+          title: updatedData.title,
+          content: updatedData.content,
+          tags: updatedData.tags,
+          source: updatedData.source,
+          usageCount: updatedData.usageCount || 0,
+          isFavorite: updatedData.isFavorite || false,
+          createdAt: updatedData.createdAt,
+          updatedAt: updatedData.updatedAt,
+          isDeleted: updatedData.isDeleted
+        }
+        
         console.log('提示词更新成功:', updated)
         return {
           success: true,
@@ -310,59 +340,32 @@ export class PromptService {
   }
 
   /**
-   * 删除提示词（软删除）
-   */
-  async deletePrompt(id: string): Promise<PromptOperationResult> {
-    try {
-      const existing = await this.getPromptById(id)
-      if (!existing) {
-        return {
-          success: false,
-          error: '提示词不存在'
-        }
-      }
-
-      // 软删除：标记为已删除 - 确保数据可序列化
-      const dataToSave = {
-        title: String(existing.title || ''),
-        content: String(existing.content || ''),
-        tags: Array.isArray(existing.tags) ? existing.tags.map(tag => String(tag)) : [],
-        source: String(existing.source || ''),
-        createdAt: String(existing.createdAt),
-        updatedAt: new Date().toISOString(),
-        isDeleted: true
-      }
-      
-      const result = this.db.put(`prompt_${id}`, dataToSave)
-
-      if (result.ok) {
-        console.log('提示词删除成功:', id)
-        return {
-          success: true,
-          message: '提示词删除成功'
-        }
-      } else {
-        return {
-          success: false,
-          error: '数据库操作失败'
-        }
-      }
-    } catch (error) {
-      console.error('删除提示词失败:', error)
-      return {
-        success: false,
-        error: '删除提示词失败'
-      }
-    }
-  }
-
-  /**
    * 物理删除提示词
    */
   async removePrompt(id: string): Promise<PromptOperationResult> {
     try {
-      const result = this.db.remove(`prompt_${id}`)
+      console.log('🗑️ 开始删除提示词:', id)
       
+      // 方法1：先获取文档，然后删除（推荐，因为有更好的错误处理）
+      let doc = this.db.get(`prompt_${id}`)
+      if (!doc) {
+        doc = this.db.get(`prompt_manager_prompt_${id}`)
+      }
+      
+      if (!doc) {
+        console.log(`提示词 ${id} 在数据库中已不存在，无需删除。`)
+        return {
+          success: true,
+          message: '提示词已删除'
+        }
+      }
+
+      console.log('🗑️ 找到文档，准备删除:', { id: doc._id, doc })
+      
+      // 使用文档对象删除
+      const result = this.db.remove(doc)
+      console.log('🗑️ 删除操作结果:', result)
+
       if (result.ok) {
         console.log('提示词物理删除成功:', id)
         return {
@@ -370,13 +373,14 @@ export class PromptService {
           message: '提示词删除成功'
         }
       } else {
+        console.error('删除失败，结果:', result)
         return {
           success: false,
-          error: '数据库操作失败'
+          error: result.message || '数据库操作失败'
         }
       }
     } catch (error) {
-      console.error('物理删除提示词失败:', error)
+      console.error('删除提示词失败:', error)
       return {
         success: false,
         error: '删除提示词失败'
@@ -400,7 +404,7 @@ export class PromptService {
         let result: PromptOperationResult
         
         if (operation === 'delete') {
-          result = await this.deletePrompt(id)
+          result = await this.removePrompt(id)
         } else if (operation === 'update' && data) {
           result = await this.updatePrompt(id, data)
         } else {

@@ -42,7 +42,7 @@ export class TagService {
 
       // 创建新标签
       const newTag: Tag = {
-        id: `tag_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: data.name.trim(),
         color: data.color || 'primary',
         description: data.description?.trim(),
@@ -52,7 +52,7 @@ export class TagService {
       }
 
       // 保存到数据库
-      this.db.put(`${TagService.TAG_STORE_KEY}_${newTag.id}`, newTag)
+      this.db.put(`${TagService.TAG_STORE_KEY}_tag_${newTag.id}`, newTag)
 
       return {
         success: true,
@@ -106,8 +106,19 @@ export class TagService {
       }
 
       // 保存到数据库
-      const saveKey = `${TagService.TAG_STORE_KEY}_${id}`
-      console.log('💾 准备保存更新的标签:', { saveKey, updatedTag })
+      let saveKey: string
+      if (id.startsWith('prompt_manager_tags_tag_')) {
+        saveKey = id
+      } else if (id.startsWith('tag_')) {
+        // 移除业务ID中的tag_前缀，然后构造完整ID
+        const cleanId = id.replace(/^tag_/, '')
+        saveKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`
+      } else {
+        // 纯时间戳ID，直接构造
+        saveKey = `${TagService.TAG_STORE_KEY}_tag_${id}`
+      }
+      
+      console.log('💾 准备保存更新的标签:', { inputId: id, saveKey, updatedTag })
       const saveResult = this.db.put(saveKey, updatedTag)
       console.log('💾 标签保存结果:', saveResult)
 
@@ -152,8 +163,34 @@ export class TagService {
       // 获取关联的提示词数量
       const affectedPrompts = await this.getPromptCountByTag(id)
 
-      // 删除标签
-      await this.db.remove(`${TagService.TAG_STORE_KEY}_${id}`)
+      // 构造正确的删除ID
+      let dbKey: string
+      if (id.startsWith('prompt_manager_tags_tag_')) {
+        dbKey = id
+      } else if (id.startsWith('tag_')) {
+        // 移除业务ID中的tag_前缀，然后构造完整ID
+        const cleanId = id.replace(/^tag_/, '')
+        dbKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`
+      } else {
+        // 纯时间戳ID，直接构造
+        dbKey = `${TagService.TAG_STORE_KEY}_tag_${id}`
+      }
+      
+      console.log('🗑️ 删除标签，ID构造:', { inputId: id, dbKey })
+      
+      // 先获取完整文档，然后删除
+      const fullDoc = await this.db.get(dbKey)
+      if (fullDoc) {
+        await this.db.remove(fullDoc)
+        console.log('✅ 标签删除成功:', dbKey)
+      } else {
+        console.log('⚠️ 标签文档不存在:', dbKey)
+        return {
+          success: false,
+          affectedPrompts: 0,
+          error: '标签不存在'
+        }
+      }
 
       // 如果有关联的提示词，需要在调用方处理提示词的标签关联
       return {
@@ -173,11 +210,71 @@ export class TagService {
   }
 
   /**
+   * 清理所有标签数据（临时方法，用于解决重复标签问题）
+   */
+  async clearAllTags(): Promise<{ success: boolean; message: string; deletedCount: number }> {
+    try {
+      console.log('🧹 开始清理所有标签数据...')
+      
+      const allTags = this.db.allDocs()
+      const tagDocs = allTags.filter(doc => doc && doc._id && doc._id.includes('tag_'))
+      
+      console.log(`找到 ${tagDocs.length} 个标签文档，准备删除...`)
+      
+      let deletedCount = 0
+      for (const tagDoc of tagDocs) {
+        try {
+          const result = this.db.remove(tagDoc)
+          if (result.ok) {
+            deletedCount++
+            console.log(`✅ 已删除标签: ${tagDoc.name} (${tagDoc._id})`)
+          } else {
+            console.error(`❌ 删除标签失败: ${tagDoc.name} (${tagDoc._id})`, result)
+          }
+        } catch (error) {
+          console.error(`❌ 删除标签时出错: ${tagDoc.name} (${tagDoc._id})`, error)
+        }
+      }
+      
+      console.log(`🧹 清理完成，共删除 ${deletedCount} 个标签`)
+      
+      return {
+        success: true,
+        message: `清理完成，共删除 ${deletedCount} 个标签`,
+        deletedCount
+      }
+    } catch (error) {
+      console.error('清理标签失败:', error)
+      return {
+        success: false,
+        message: '清理标签失败',
+        deletedCount: 0
+      }
+    }
+  }
+
+  /**
    * 根据ID获取标签
    */
   async getTagById(id: string): Promise<Tag | null> {
     try {
-      const tag = await this.db.get(`${TagService.TAG_STORE_KEY}_${id}`)
+      // 统一构造完整的数据库ID：prompt_manager_tags_tag_{业务ID}
+      // 如果传入的ID已经包含完整前缀，直接使用；否则构造
+      let dbKey: string
+      if (id.startsWith('prompt_manager_tags_tag_')) {
+        dbKey = id
+      } else if (id.startsWith('tag_')) {
+        // 移除业务ID中的tag_前缀，然后构造完整ID
+        const cleanId = id.replace(/^tag_/, '')
+        dbKey = `${TagService.TAG_STORE_KEY}_tag_${cleanId}`
+      } else {
+        // 纯时间戳ID，直接构造
+        dbKey = `${TagService.TAG_STORE_KEY}_tag_${id}`
+      }
+      
+      console.log('🔍 获取标签，ID构造:', { inputId: id, dbKey })
+      
+      const tag = await this.db.get(dbKey)
       return tag || null
     } catch (error) {
       console.error('获取标签失败:', error)
@@ -190,15 +287,25 @@ export class TagService {
    */
   async getAllTags(): Promise<Tag[]> {
     try {
-      // 直接调用同步的 allDocs 方法
-      const allTags = this.db.allDocs<Tag>()
+      // 直接调用同步的 allDocs 方法，过滤逻辑已在 utoolsAPI 层面处理
+      const allTags = this.db.allDocs('tag_')
       console.log('从数据库获取的所有标签:', allTags)
       
-      const tags = allTags.filter(tag => 
-        tag && tag.id && tag.id.startsWith('tag_') && !tag.isDeleted
-      )
+      const tags = allTags
+        // 进一步确保只处理标签数据
+        .filter(tag => tag && tag._id && tag._id.includes('tag_'))
+        .map(tag => ({
+          id: tag._id.replace(/^.*tag_/, ''), // 提取时间戳部分作为业务ID
+          name: tag.name || '',
+          color: tag.color || 'default',
+          description: tag.description || '',
+          promptCount: tag.promptCount || 0,
+          createdAt: tag.createdAt || new Date().toISOString(),
+          updatedAt: tag.updatedAt || new Date().toISOString(),
+          _rev: tag._rev
+        }))
       
-      console.log('过滤后的标签:', tags)
+      console.log('映射后的标签:', tags)
 
       // 按创建时间排序
       const sortedTags = tags.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())

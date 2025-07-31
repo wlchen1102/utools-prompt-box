@@ -8,10 +8,11 @@ export interface Prompt {
   title: string                 // 提示词标题
   content: string               // 提示词内容（Markdown格式）
   tags: string[]               // 关联的标签ID数组
+  usageCount: number            // 使用次数
+  isFavorite: boolean           // 是否收藏
   source?: string              // 来源说明
   createdAt: string            // 创建时间 ISO字符串
   updatedAt: string            // 更新时间 ISO字符串
-  isDeleted?: boolean          // 软删除标记
 }
 
 // 创建提示词的DTO
@@ -28,6 +29,8 @@ export interface UpdatePromptDTO {
   content?: string
   tags?: string[]
   source?: string
+  usageCount?: number
+  isFavorite?: boolean
 }
 
 // 提示词搜索参数
