@@ -368,11 +368,6 @@ const cleanInvalidPrompts = async () => {
           />
         </div>
         
-        <!-- 统计信息 -->
-        <div class="stats-info">
-          <span class="prompt-count">共 {{ promptCount }} 个提示词</span>
-        </div>
-        
         <!-- 添加按钮 -->
         <button class="btn-add" @click="addPrompt">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -566,17 +561,6 @@ const cleanInvalidPrompts = async () => {
   gap: 16px;
   width: 100%;
   justify-content: space-between;
-}
-
-.stats-info {
-  flex: 1;
-  text-align: center;
-}
-
-.prompt-count {
-  color: var(--text-color-secondary);
-  font-size: 14px;
-  font-weight: 500;
 }
 
 .search-box {
