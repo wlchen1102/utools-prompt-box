@@ -269,8 +269,8 @@ export class TagService {
       
       console.log('映射后的标签:', tags)
 
-      // 按创建时间排序
-      const sortedTags = tags.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      // 按创建时间倒序排序
+      const sortedTags = tags.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       console.log('排序后的标签:', sortedTags)
       
       return sortedTags

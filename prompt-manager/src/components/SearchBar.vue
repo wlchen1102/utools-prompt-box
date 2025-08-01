@@ -5,7 +5,6 @@
         ref="searchInputRef"
         v-model:value="searchKeyword"
         placeholder="搜索提示词标题或内容..."
-        clearable
         :loading="searching"
         @input="handleSearchInput"
         @keyup.enter="handleSearch"
@@ -38,31 +37,16 @@
           </n-button>
         </template>
       </n-input>
-      
-      <!-- 高级搜索按钮 -->
-      <n-button
-        @click="showAdvancedSearch = !showAdvancedSearch"
-        :type="showAdvancedSearch ? 'primary' : 'default'"
-        ghost
-        class="advanced-btn"
-      >
-        <template #icon>
-          <n-icon>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-            </svg>
-          </n-icon>
-        </template>
-        筛选
-      </n-button>
+
     </n-input-group>
     
     <!-- 搜索历史下拉 -->
-    <div 
-      v-if="showHistory && searchHistory.length > 0" 
-      class="search-history"
-      @mousedown.prevent
-    >
+    <transition name="dropdown">
+      <div 
+        v-if="showHistory && searchHistory.length > 0" 
+        class="search-history"
+        @mousedown.prevent
+      >
       <div class="history-header">
         <span class="history-title">搜索历史</span>
         <n-button 
@@ -103,80 +87,16 @@
           </n-button>
         </div>
       </div>
-    </div>
-    
-    <!-- 高级搜索面板 -->
-    <div v-if="showAdvancedSearch" class="advanced-search">
-      <div class="advanced-header">
-        <span class="advanced-title">高级搜索</span>
-        <n-button 
-          quaternary 
-          size="small" 
-          @click="resetAdvanced"
-          class="reset-btn"
-        >
-          重置
-        </n-button>
       </div>
-      
-      <div class="advanced-content">
-        <!-- 按来源筛选 -->
-        <div class="filter-group">
-          <label class="filter-label">来源筛选</label>
-          <n-input
-            v-model:value="advancedFilters.source"
-            placeholder="按来源筛选"
-            clearable
-            size="small"
-          />
-        </div>
-        
-        <!-- 创建时间范围 -->
-        <div class="filter-group">
-          <label class="filter-label">创建时间</label>
-          <n-date-picker
-            v-model:value="advancedFilters.dateRange"
-            type="daterange"
-            size="small"
-            clearable
-            placeholder="选择时间范围"
-            class="date-picker"
-          />
-        </div>
-        
-        <!-- 排序方式 -->
-        <div class="filter-group">
-          <label class="filter-label">排序方式</label>
-          <n-select
-            v-model:value="advancedFilters.sortBy"
-            :options="sortOptions"
-            size="small"
-            clearable
-            placeholder="选择排序方式"
-            class="sort-select"
-          />
-        </div>
-        
-        <!-- 应用按钮 -->
-        <div class="filter-actions">
-          <n-button 
-            type="primary" 
-            size="small" 
-            @click="applyAdvancedSearch"
-            :loading="searching"
-          >
-            应用筛选
-          </n-button>
-        </div>
-      </div>
-    </div>
+    </transition>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { 
-  NInput, NInputGroup, NButton, NIcon, NSelect, NDatePicker
+  NInput, NInputGroup, NButton, NIcon
 } from 'naive-ui'
 import type { PromptSearchParams } from '@/types/Prompt'
 
@@ -204,36 +124,10 @@ const searchInputRef = ref()
 const searchKeyword = ref('')
 const searching = ref(false)
 const showHistory = ref(false)
-const showAdvancedSearch = ref(false)
 const searchHistory = ref<string[]>([])
-
-// 高级搜索参数
-const advancedFilters = ref({
-  source: '',
-  dateRange: null as [number, number] | null,
-  sortBy: null as string | null
-})
 
 // 防抖定时器
 let debounceTimer: number | null = null
-
-// 排序选项
-const sortOptions = [
-  { label: '按创建时间降序', value: 'createdAt_desc' },
-  { label: '按创建时间升序', value: 'createdAt_asc' },
-  { label: '按更新时间降序', value: 'updatedAt_desc' },
-  { label: '按更新时间升序', value: 'updatedAt_asc' },
-  { label: '按标题升序', value: 'title_asc' },
-  { label: '按标题降序', value: 'title_desc' }
-]
-
-// 计算属性
-const hasFilters = computed(() => {
-  return searchKeyword.value.trim() || 
-         advancedFilters.value.source ||
-         advancedFilters.value.dateRange ||
-         advancedFilters.value.sortBy
-})
 
 // 监听 loading 变化
 watch(() => props.loading, (newVal) => {
@@ -315,25 +209,19 @@ const performSearch = () => {
     addToHistory(keyword)
   }
   
-  if (advancedFilters.value.source) {
-    params.source = advancedFilters.value.source
-  }
-  
-  if (advancedFilters.value.sortBy) {
-    const [sortBy, sortOrder] = advancedFilters.value.sortBy.split('_')
-    params.sortBy = sortBy as any
-    params.sortOrder = sortOrder as 'asc' | 'desc'
-  }
-  
-  // TODO: 处理日期范围
-  
   emit('search', params)
 }
 
 const clearSearch = () => {
   searchKeyword.value = ''
-  resetAdvanced()
-  showHistory.value = false
+  // 如果有搜索历史，则显示弹窗
+  if (searchHistory.value.length > 0) {
+    showHistory.value = true
+  }
+  // 让搜索框重新获得焦点
+  nextTick(() => {
+    searchInputRef.value?.focus()
+  })
   emit('clear')
 }
 
@@ -362,18 +250,7 @@ const clearHistory = () => {
   saveSearchHistory()
 }
 
-const resetAdvanced = () => {
-  advancedFilters.value = {
-    source: '',
-    dateRange: null,
-    sortBy: null
-  }
-}
 
-const applyAdvancedSearch = () => {
-  performSearch()
-  showAdvancedSearch.value = false
-}
 
 // 初始化
 loadSearchHistory()
@@ -397,137 +274,104 @@ loadSearchHistory()
   opacity: 1;
 }
 
-.advanced-btn {
-  border-left: none;
-}
-
 .search-history {
   position: absolute;
   top: 100%;
   left: 0;
-  right: 40px;
-  background: var(--n-color-popover);
-  border: 1px solid var(--n-border-color);
-  border-radius: 6px;
-  box-shadow: var(--n-box-shadow-2);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e0e0e6;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.08), 0 9px 28px 0 rgba(0, 0, 0, 0.05), 0 3px 6px -4px rgba(0, 0, 0, 0.12);
   z-index: 1000;
   max-height: 240px;
   overflow-y: auto;
+  margin-top: 6px;
+  backdrop-filter: blur(8px);
 }
 
 .history-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--n-border-color);
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-radius: 8px 8px 0 0;
 }
 
 .history-title {
-  font-size: 12px;
-  color: var(--n-text-color-2);
-  font-weight: 500;
+  font-size: 13px;
+  color: #333333;
+  font-weight: 600;
 }
 
 .clear-history-btn {
   font-size: 11px;
+  color: #666666;
 }
 
 .history-list {
-  padding: 4px 0;
+  padding: 8px 0;
 }
 
 .history-item {
   display: flex;
   align-items: center;
-  padding: 6px 12px;
+  padding: 10px 16px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease;
+  border-radius: 4px;
+  margin: 0 8px;
 }
 
 .history-item:hover {
-  background: var(--n-color-hover);
+  background: #f5f5f5;
 }
 
 .history-icon {
-  margin-right: 8px;
-  color: var(--n-text-color-3);
+  margin-right: 10px;
+  color: #999999;
 }
 
 .history-text {
   flex: 1;
-  font-size: 13px;
-  color: var(--n-text-color-2);
+  font-size: 14px;
+  color: #333333;
+  line-height: 1.4;
 }
 
 .remove-btn {
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease;
+  color: #999999;
 }
 
 .history-item:hover .remove-btn {
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .remove-btn:hover {
   opacity: 1 !important;
+  color: #ff4757;
 }
 
-.advanced-search {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: var(--n-color-popover);
-  border: 1px solid var(--n-border-color);
-  border-radius: 6px;
-  box-shadow: var(--n-box-shadow-2);
-  z-index: 1000;
-  margin-top: 4px;
+/* 下拉动画效果 */
+.dropdown-enter-active {
+  transition: all 0.2s ease-out;
 }
 
-.advanced-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--n-border-color);
+.dropdown-leave-active {
+  transition: all 0.15s ease-in;
 }
 
-.advanced-title {
-  font-size: 14px;
-  color: var(--n-text-color-1);
-  font-weight: 500;
+.dropdown-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
 }
 
-.advanced-content {
-  padding: 16px;
-}
-
-.filter-group {
-  margin-bottom: 16px;
-}
-
-.filter-group:last-child {
-  margin-bottom: 0;
-}
-
-.filter-label {
-  display: block;
-  font-size: 12px;
-  color: var(--n-text-color-2);
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.date-picker,
-.sort-select {
-  width: 100%;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
 }
 </style> 

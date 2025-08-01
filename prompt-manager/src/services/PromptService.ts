@@ -46,7 +46,7 @@ export class PromptService {
         }))
         .filter((prompt: Prompt) => prompt.title && prompt.title.trim()) // 只过滤无效数据
         .sort((a: Prompt, b: Prompt) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
 
       console.log('✅ PromptService.getAllPrompts 返回:', prompts)
