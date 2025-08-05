@@ -17,6 +17,7 @@ interface Props {
   disabled?: boolean
   readonly?: boolean
   theme?: 'light' | 'dark'
+  lineWrap?: boolean
 }
 
 interface Emits {
@@ -30,7 +31,8 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: '请输入提示词内容（支持 Markdown 格式）',
   disabled: false,
   readonly: false,
-  theme: 'light'
+  theme: 'light',
+  lineWrap: true
 })
 
 const emit = defineEmits<Emits>()
@@ -44,6 +46,8 @@ const createEditorState = (content: string) => {
     basicSetup,
     markdown(),
     placeholder(props.placeholder),
+    // 根据 lineWrap 属性决定是否启用换行
+    ...(props.lineWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newValue = update.state.doc.toString()
@@ -90,6 +94,22 @@ const createEditorState = (content: string) => {
         height: '100%',
         backgroundColor: '#f8f9fa'
       },
+      '.cm-gutters': {
+        backgroundColor: '#f8f9fa',
+        border: 'none'
+      },
+      '.cm-lineNumbers': {
+        backgroundColor: '#f8f9fa'
+      },
+      '.cm-lineNumbers .cm-gutterElement': {
+        color: '#9ca3af',
+        fontSize: '12px'
+      },
+      '.cm-activeLineGutter': {
+        backgroundColor: 'rgba(0, 178, 90, 0.05)',
+        color: 'var(--primary-color)',
+        fontWeight: '500'
+      },
       // Markdown 语法高亮样式
       '.cm-header': {
         color: 'var(--primary-color)',
@@ -107,7 +127,7 @@ const createEditorState = (content: string) => {
         textDecoration: 'line-through'
       },
       '.cm-link': {
-        color: '#0ea5e9',
+        color: 'var(--primary-color)',
         textDecoration: 'underline'
       },
       '.cm-monospace': {
@@ -122,8 +142,18 @@ const createEditorState = (content: string) => {
       '.cm-quote': {
         color: '#6b7280',
         fontStyle: 'italic',
-        borderLeft: '3px solid #d1d5db',
+        borderLeft: '3px solid var(--primary-color)',
         paddingLeft: '8px'
+      },
+      // 光标和选择相关样式
+      '.cm-cursor, .cm-dropCursor': {
+        borderLeftColor: 'var(--primary-color)'
+      },
+      '.cm-selectionBackground': {
+        backgroundColor: 'rgba(0, 178, 90, 0.2)'
+      },
+      '.cm-focused .cm-selectionBackground': {
+        backgroundColor: 'rgba(0, 178, 90, 0.25)'
       }
     })
   ]
@@ -190,6 +220,17 @@ watch(() => props.theme, async () => {
   }
 })
 
+// 监听换行设置变化
+watch(() => props.lineWrap, async () => {
+  if (editorView) {
+    // 销毁旧编辑器
+    editorView.destroy()
+    // 重新创建编辑器
+    await nextTick()
+    initEditor()
+  }
+})
+
 // 监听只读状态变化
 watch(() => [props.readonly, props.disabled], ([readonly, disabled]) => {
   if (editorView) {
@@ -235,6 +276,15 @@ defineExpose({
   caret-color: var(--primary-color);
 }
 
+/* 光标样式 */
+:global(.cm-cursor) {
+  border-left-color: var(--primary-color) !important;
+}
+
+:global(.cm-cursor-primary) {
+  border-left-color: var(--primary-color) !important;
+}
+
 /* 占位符样式 */
 :global(.cm-placeholder) {
   color: #6c757d;
@@ -244,6 +294,39 @@ defineExpose({
 /* 选中文本样式 */
 :global(.cm-selectionBackground) {
   background-color: rgba(0, 178, 90, 0.2) !important;
+}
+
+/* 焦点时的选中样式 */
+:global(.cm-focused .cm-selectionBackground) {
+  background-color: rgba(0, 178, 90, 0.25) !important;
+}
+
+/* 激活行背景 */
+:global(.cm-activeLine) {
+  background-color: rgba(0, 178, 90, 0.05) !important;
+}
+
+/* 行号区域样式 */
+:global(.cm-gutters) {
+  background-color: #f8f9fa !important;
+  border-right: 1px solid #e9ecef !important;
+}
+
+:global(.cm-lineNumbers) {
+  background-color: #f8f9fa !important;
+}
+
+:global(.cm-lineNumbers .cm-gutterElement) {
+  color: #9ca3af !important;
+  font-size: 12px !important;
+  padding-right: 8px !important;
+}
+
+/* 激活行的行号样式 */
+:global(.cm-activeLineGutter) {
+  background-color: rgba(0, 178, 90, 0.05) !important;
+  color: var(--primary-color) !important;
+  font-weight: 500 !important;
 }
 
 /* 搜索匹配样式 */

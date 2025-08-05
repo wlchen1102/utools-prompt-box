@@ -55,30 +55,52 @@
       <n-form-item path="content" class="form-item-clean">
         <div class="content-editor-container">
           <div class="editor-header">
-            <span class="editor-label"></span>
-            <n-button 
-              size="small" 
-              quaternary 
-              type="primary" 
-              @click="copyContent"
-              :disabled="!formData.content.trim()"
-            >
-              <template #icon>
-                <n-icon>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="m5 15-4-4 4-4"></path>
-                    <path d="m11 6 4-4 4 4"></path>
-                  </svg>
-                </n-icon>
-              </template>
-              一键复制
-            </n-button>
+            <div class="editor-spacer"></div>
+            <div class="editor-right-controls">
+              <span class="editor-language">Markdown</span>
+              <n-button 
+                size="small" 
+                quaternary 
+                @click="toggleLineWrap"
+                class="line-wrap-btn"
+                :class="{ 'line-wrap-active': lineWrapEnabled }"
+                :title="lineWrapEnabled ? '关闭自动换行' : '开启自动换行'"
+              >
+                <template #icon>
+                  <n-icon>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path v-if="lineWrapEnabled" d="M3 10h11M9 21V3m0 18l3-3m-3 3l-3-3"></path>
+                      <path v-else d="M3 6h18M3 12h18M3 18h18"></path>
+                    </svg>
+                  </n-icon>
+                </template>
+                自动换行
+              </n-button>
+              <n-button 
+                size="small" 
+                quaternary 
+                type="primary" 
+                @click="copyContent"
+                :disabled="!formData.content.trim()"
+                class="copy-btn"
+              >
+                <template #icon>
+                  <n-icon>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </n-icon>
+                </template>
+                复制
+              </n-button>
+            </div>
           </div>
           <MarkdownEditor
             v-model="formData.content"
             placeholder="请输入提示词内容，支持 Markdown 格式..."
             :disabled="loading"
+            :line-wrap="lineWrapEnabled"
             class="content-editor"
           />
         </div>
@@ -155,6 +177,7 @@ const message = useMessage()
 // 响应式数据
 const formRef = ref<FormInst>()
 const loading = ref(false)
+const lineWrapEnabled = ref(true)
 
 // 表单数据
 const formData = ref<CreatePromptDTO & { id?: string }>({
@@ -241,6 +264,12 @@ const copyContent = async () => {
     message.error('复制失败，请手动复制')
     console.error('复制失败:', error)
   }
+}
+
+const toggleLineWrap = () => {
+  lineWrapEnabled.value = !lineWrapEnabled.value
+  // 这里我们需要通知 MarkdownEditor 组件更新换行设置
+  // 暂时先切换状态，后续需要在 MarkdownEditor 中实现换行功能
 }
 
 const handleCreateTag = (label: string) => {
@@ -475,8 +504,43 @@ tagStore.loadTags()
   color: #6c757d;
 }
 
-.editor-label {
+.editor-spacer {
+  flex: 1;
+}
+
+.editor-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-language {
+  font-size: 12px;
   font-weight: 500;
+  color: #6c757d;
+  padding: 4px 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.line-wrap-btn,
+.copy-btn {
+  font-size: 12px !important;
+}
+
+.line-wrap-btn.line-wrap-active {
+  background: rgba(0, 178, 90, 0.1) !important;
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+}
+
+.line-wrap-btn :deep(.n-button__content) {
+  gap: 4px;
+}
+
+.copy-btn :deep(.n-button__content) {
+  gap: 4px;
 }
 
 .content-editor {
