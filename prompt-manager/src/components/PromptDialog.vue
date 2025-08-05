@@ -75,14 +75,11 @@
               一键复制
             </n-button>
           </div>
-          <n-input
-            v-model:value="formData.content"
-            type="textarea"
+          <MarkdownEditor
+            v-model="formData.content"
             placeholder="请输入提示词内容，支持 Markdown 格式..."
-            :rows="10"
             :disabled="loading"
             class="content-editor"
-            show-count
           />
         </div>
       </n-form-item>
@@ -131,6 +128,7 @@ import type { Prompt, CreatePromptDTO, UpdatePromptDTO } from '@/types/Prompt'
 import type { Tag, CreateTagDTO, UpdateTagDTO } from '@/types/Tag'
 import { validatePrompt } from '@/utils/validators'
 import { promptService } from '@/services/PromptService'
+import MarkdownEditor from './MarkdownEditor.vue'
 
 // Props 和 Emits
 interface Props {
@@ -459,9 +457,11 @@ tagStore.loadTags()
 
 .content-editor-container {
   width: 100%;
-  border: 1px solid var(--n-border-color);
+  border: 1px solid #e9ecef;
   border-radius: 6px;
   overflow: hidden;
+  min-height: 350px;
+  background: #f8f9fa;
 }
 
 .editor-header {
@@ -469,10 +469,10 @@ tagStore.loadTags()
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: var(--n-color-embedded);
-  border-bottom: 1px solid var(--n-border-color);
+  background: #ffffff;
+  border-bottom: 1px solid #e9ecef;
   font-size: 12px;
-  color: var(--n-text-color-2);
+  color: #6c757d;
 }
 
 .editor-label {
@@ -483,27 +483,45 @@ tagStore.loadTags()
   width: 100%;
   border: none !important;
   border-radius: 0 !important;
+  height: 100%;
+  min-height: 300px;
 }
 
-.content-editor :deep(.n-input__wrapper) {
+/* MarkdownEditor 在 PromptDialog 中的样式 */
+.content-editor :deep(.cm-editor) {
   border: none !important;
   border-radius: 0 !important;
-  background: var(--n-color-embedded-popover);
-  width: 100%;
+  background: transparent;
+  font-size: 14px;
+  height: 100%;
+  min-height: 300px;
 }
 
-.content-editor :deep(.n-input__textarea) {
+.content-editor :deep(.markdown-editor) {
+  border: none !important;
+  background: transparent !important;
+  height: 100%;
+  min-height: 300px;
+}
+
+.content-editor :deep(.cm-content) {
   font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
   font-size: 16px;
   line-height: 1.5;
   background: var(--n-color-embedded-popover);
+  padding: 12px;
+  min-height: 200px;
 }
 
-.content-editor :deep(.n-input:not(.n-input--disabled):hover .n-input__wrapper) {
+.content-editor :deep(.cm-focused) {
+  outline: none;
+}
+
+.content-editor :deep(.cm-editor:hover) {
   border-color: var(--n-border-color-hover);
 }
 
-.content-editor :deep(.n-input:focus-within .n-input__wrapper) {
+.content-editor :deep(.cm-editor.cm-focused) {
   border-color: var(--n-color-primary);
   box-shadow: 0 0 0 2px var(--n-color-primary-opacity);
 }
