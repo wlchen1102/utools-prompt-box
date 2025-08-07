@@ -7,7 +7,6 @@ import { useMessage } from 'naive-ui'
 import TagPanel from '@/components/TagPanel.vue'
 import TagDialog from '@/components/TagDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import PromptViewDialog from '@/components/PromptViewDialog.vue'
 import PromptDialog from '@/components/PromptDialog.vue'
 import SearchBar from '@/components/SearchBar.vue'
 import { useTagStore } from '@/stores/tagStore'
@@ -32,10 +31,6 @@ const confirmDialogVisible = ref(false)
 const deletingTag = ref<Tag | null>(null)
 const deletingPrompt = ref<Prompt | null>(null)
 const promptDeleteDialogVisible = ref(false)
-
-// 提示词查看弹窗状态
-const promptViewDialogVisible = ref(false)
-const viewingPrompt = ref<Prompt | null>(null)
 
 // 提示词编辑弹窗状态
 const promptDialogVisible = ref(false)
@@ -229,16 +224,12 @@ const handleContainerClick = (event: Event) => {
   }
 }
 
-const viewPrompt = (prompt: Prompt) => {
-  console.log('查看提示词被调用:', prompt) // 调试日志
-  viewingPrompt.value = prompt
-  promptViewDialogVisible.value = true
-}
+
 
 const copyPrompt = async (prompt: Prompt) => {
   try {
-    // 构建要复制的内容
-    const content = `# ${prompt.title}\n\n${prompt.content}`
+    // 只复制提示词内容，不包含标题
+    const content = prompt.content
     
     // 尝试使用 uTools API 复制
     if (window.utools && window.utools.copyText) {
@@ -441,12 +432,6 @@ const cleanInvalidPrompts = async () => {
             <div class="card-header">
               <h4 class="card-title">{{ prompt.title }}</h4>
               <div class="card-actions">
-                <button class="card-btn" @click="viewPrompt(prompt)" title="查看">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                </button>
                 <button class="card-btn" @click="copyPrompt(prompt)" title="复制">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -515,15 +500,6 @@ const cleanInvalidPrompts = async () => {
       positive-text="删除"
       negative-text="取消"
       @confirm="confirmDeletePrompt"
-    />
-
-    <!-- 提示词查看弹窗 -->
-    <PromptViewDialog
-      v-model:visible="promptViewDialogVisible"
-      :prompt="viewingPrompt"
-      :tags="tagStore.tags"
-      @copy="copyPrompt"
-      @edit="editPrompt"
     />
 
     <!-- 提示词编辑弹窗 -->

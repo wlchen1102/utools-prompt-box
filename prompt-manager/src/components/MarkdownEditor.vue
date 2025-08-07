@@ -6,7 +6,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { basicSetup } from 'codemirror'
 import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { placeholder } from '@codemirror/view'
@@ -39,6 +39,8 @@ const emit = defineEmits<Emits>()
 
 const editorContainer = ref<HTMLElement>()
 let editorView: EditorView | null = null
+// 用于管理只读状态的 Compartment
+const readOnlyCompartment = new Compartment()
 
 // 创建编辑器状态
 const createEditorState = (content: string) => {
@@ -48,6 +50,8 @@ const createEditorState = (content: string) => {
     placeholder(props.placeholder),
     // 根据 lineWrap 属性决定是否启用换行
     ...(props.lineWrap ? [EditorView.lineWrapping] : []),
+    // 添加只读状态管理
+    readOnlyCompartment.of(EditorState.readOnly.of(props.readonly || props.disabled)),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newValue = update.state.doc.toString()
@@ -55,11 +59,13 @@ const createEditorState = (content: string) => {
         emit('change', newValue)
       }
     }),
-    EditorView.focusChangeEffect.of((state, focusing) => {
-      if (focusing) {
-        emit('focus')
-      } else {
-        emit('blur')
+    EditorView.updateListener.of((update) => {
+      if (update.focusChanged) {
+        if (update.view.hasFocus) {
+          emit('focus')
+        } else {
+          emit('blur')
+        }
       }
     }),
     EditorView.theme({
@@ -180,12 +186,7 @@ const initEditor = () => {
     parent: editorContainer.value
   })
 
-  // 设置只读状态
-  if (props.readonly || props.disabled) {
-    editorView.dispatch({
-      effects: EditorView.editable.reconfigure(EditorState.readOnly.of(true))
-    })
-  }
+  // 初始化时不需要额外设置只读状态，因为已经在 createEditorState 中配置了
 }
 
 // 更新编辑器内容
@@ -235,7 +236,7 @@ watch(() => props.lineWrap, async () => {
 watch(() => [props.readonly, props.disabled], ([readonly, disabled]) => {
   if (editorView) {
     editorView.dispatch({
-      effects: EditorView.editable.reconfigure(EditorState.readOnly.of(readonly || disabled))
+      effects: [readOnlyCompartment.reconfigure(EditorState.readOnly.of(readonly || disabled))]
     })
   }
 })

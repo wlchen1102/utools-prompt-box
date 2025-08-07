@@ -36,8 +36,8 @@ const handleView = () => {
 
 const handleCopy = async () => {
   try {
-    // 复制 Markdown 格式内容到剪贴板
-    const markdownContent = `# ${props.prompt.title}\n\n${props.prompt.content}`
+    // 只复制提示词内容，不包含标题
+    const markdownContent = props.prompt.content
     
     if (window.utools) {
       // uTools 环境下使用原生 API

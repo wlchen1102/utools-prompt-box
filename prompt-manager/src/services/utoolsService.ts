@@ -10,7 +10,7 @@ class UtoolsService {
   private preload: PreloadAPI | null = null
 
   constructor() {
-    this.preload = window.preload || null
+    this.preload = (window as any).preload || null
   }
 
   /**
@@ -24,7 +24,7 @@ class UtoolsService {
    * 获取当前主题
    */
   get theme(): 'light' | 'dark' {
-    return this.preload?.getTheme() || 'light'
+    return this.preload?.getTheme?.() || 'light'
   }
 
   /**
@@ -81,7 +81,7 @@ class UtoolsService {
     
     try {
       const docs = this.preload.db.allDocs('prompt_')
-      return docs.map(doc => doc.data).filter(Boolean)
+      return docs.map((doc: UtoolsDbDoc) => doc.data).filter(Boolean)
     } catch (error) {
       console.error('获取所有提示词失败:', error)
       return []
@@ -112,7 +112,7 @@ class UtoolsService {
     
     try {
       const docs = this.preload.db.allDocs('tag_')
-      return docs.map(doc => doc.data).filter(Boolean)
+      return docs.map((doc: UtoolsDbDoc) => doc.data).filter(Boolean)
     } catch (error) {
       console.error('获取所有标签失败:', error)
       return []
@@ -134,7 +134,8 @@ class UtoolsService {
       return false
     }
     
-    return this.preload.clipboard.writeText(text)
+    this.preload.clipboard.writeText(text)
+    return true
   }
 
   /**
@@ -150,7 +151,8 @@ class UtoolsService {
       return false
     }
     
-    return this.preload.showNotification(title, body)
+    this.preload.showNotification(title)
+    return true
   }
 
   /**
@@ -210,13 +212,13 @@ class UtoolsService {
       { name: '所有文件', extensions: ['*'] }
     ]
     
-    const files = this.preload.file.selectFile(filters)
-    if (!files || files.length === 0) return []
-    
-    const content = this.preload.file.readFile(files[0])
-    if (!content) return []
-    
     try {
+      const files = await this.preload.file.selectFile(filters)
+      if (!files || files.length === 0) return []
+      
+      const content = await this.preload.file.readFile(files[0])
+      if (!content) return []
+      
       const prompts = JSON.parse(content)
       return Array.isArray(prompts) ? prompts : []
     } catch (error) {
@@ -259,7 +261,7 @@ class UtoolsService {
    * 用户信息
    */
   getUserInfo() {
-    return this.preload?.getUserInfo() || null
+    return this.preload?.getUserInfo?.() || null
   }
 }
 
