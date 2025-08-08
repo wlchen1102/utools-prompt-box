@@ -201,10 +201,7 @@ const tagOptions = computed(() => {
 
 // 表单验证规则
 const rules = {
-  title: [
-    { required: true, message: '请输入提示词标题', trigger: 'blur' },
-    { min: 1, max: 100, message: '标题长度应在 1-100 个字符', trigger: 'blur' }
-  ],
+  // 标题非必填
   content: [
     { required: true, message: '请输入提示词内容', trigger: 'blur' },
     { min: 1, max: 10000, message: '内容长度应在 1-10000 个字符', trigger: 'blur' }
@@ -283,18 +280,32 @@ const handleCreateTag = (label: string) => {
 
 const handleSave = async () => {
   try {
-    // 表单验证
-    await formRef.value?.validate()
-    
-    // 基础表单验证（不包括ID验证，因为ID由服务生成）
-    if (!formData.value.title.trim()) {
-      message.error('请输入提示词标题')
-      return
-    }
-    if (!formData.value.content.trim()) {
+    // 先做关键必填的轻量校验，避免进入表单校验抛异常后被统一兜底成“保存失败”
+    if (!formData.value.content || !formData.value.content.trim()) {
       message.error('请输入提示词内容')
       return
     }
+
+    // 运行内置表单校验（目前仅 content 长度等），若异常则解析错误信息
+    try {
+      await formRef.value?.validate()
+    } catch (err) {
+      const errors = err as unknown
+      if (Array.isArray(errors)) {
+        // Naive UI: [{ path: string; message: string; ... }]
+        const first = errors[0] as { path?: string; message?: string }
+        if (first?.path === 'content') {
+          message.error('请输入提示词内容')
+        } else {
+          message.error(first?.message || '保存失败，请重试')
+        }
+        return
+      }
+      message.error('保存失败，请重试')
+      return
+    }
+    
+    // 基础表单验证（仅提示词内容必填）已在前置处理
     
     loading.value = true
     
@@ -320,7 +331,7 @@ const handleSave = async () => {
     } else {
       // 新增模式
       const createData: CreatePromptDTO = {
-        title: formData.value.title,
+        title: formData.value.title || '',
         content: formData.value.content,
         tags: formData.value.tags,
         source: formData.value.source

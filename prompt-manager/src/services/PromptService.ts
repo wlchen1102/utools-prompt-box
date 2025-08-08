@@ -44,7 +44,6 @@ export class PromptService {
           createdAt: doc.createdAt as string || new Date().toISOString(),
           updatedAt: doc.updatedAt as string || new Date().toISOString()
         }))
-        .filter((prompt: Prompt) => prompt.title && prompt.title.trim()) // 只过滤无效数据
         .sort((a: Prompt, b: Prompt) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
@@ -197,13 +196,7 @@ export class PromptService {
         updatedAt: now
       }
 
-      // 基础验证
-      if (!prompt.title.trim()) {
-        return {
-          success: false,
-          error: '提示词标题不能为空'
-        }
-      }
+      // 基础验证（仅内容必填，标题可为空）
       if (!prompt.content.trim()) {
         return {
           success: false,
@@ -266,13 +259,7 @@ export class PromptService {
         }
       }
 
-      // 基础验证
-      if (data.title !== undefined && !data.title.trim()) {
-        return {
-          success: false,
-          error: '提示词标题不能为空'
-        }
-      }
+      // 基础验证：仅当传入 content 时才校验非空
       if (data.content !== undefined && !data.content.trim()) {
         return {
           success: false,

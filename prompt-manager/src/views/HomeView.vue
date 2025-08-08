@@ -430,7 +430,7 @@ const cleanInvalidPrompts = async () => {
             class="prompt-card"
           >
             <div class="card-header">
-              <h4 class="card-title">{{ prompt.title }}</h4>
+                <h4 class="card-title">{{ prompt.title || '' }}</h4>
               <div class="card-actions">
                 <button class="card-btn" @click="copyPrompt(prompt)" title="复制">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
