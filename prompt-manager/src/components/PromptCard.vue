@@ -138,22 +138,11 @@ const formatTime = (timeStr: string) => {
       </div>
     </div>
     
-    <!-- 卡片内容 -->
+    <!-- 卡片内容：仅展示提示词预览，不显示备注/来源 -->
     <div class="card-content">
       <p class="content-preview">
         {{ getContentPreview(prompt.content) }}
       </p>
-      
-      <!-- 来源链接（如果有） -->
-      <div v-if="prompt.source" class="card-source">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-        </svg>
-        <a :href="prompt.source" target="_blank" class="source-link" :title="prompt.source">
-          来源链接
-        </a>
-      </div>
     </div>
     
     <!-- 卡片底部 -->
@@ -316,29 +305,7 @@ const formatTime = (timeStr: string) => {
   min-height: 60px;
 }
 
-.card-source {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.source-link {
-  font-size: 12px;
-  color: var(--primary-color);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.source-link:hover {
-  color: #00a555;
-  text-decoration: underline;
-}
-
-.card-source svg {
-  color: var(--text-color-secondary);
-  flex-shrink: 0;
-}
+/* 备注/来源样式已移除，保持卡片简洁 */
 
 .card-footer {
   display: flex;

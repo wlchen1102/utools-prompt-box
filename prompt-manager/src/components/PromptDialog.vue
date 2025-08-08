@@ -117,10 +117,22 @@
           :disabled="loading"
           clearable
           filterable
-          tag
-          :on-create="handleCreateTag"
+          :on-search="handleTagSearch"
           size="large"
-        />
+        >
+          <!-- 自定义空状态：替换默认 No Data 为“创建标签” -->
+          <template #empty>
+            <div
+              v-if="showCreateAction"
+              class="create-tag-action"
+              @click="handleCreateFromInput"
+            >
+              <span class="create-tag-plus">＋</span>
+              <span>创建标签 “{{ tagSearchQuery }}”</span>
+            </div>
+            <div v-else class="create-tag-empty-tips">请输入以搜索或创建标签</div>
+          </template>
+        </n-select>
       </n-form-item>
 
       <!-- 来源链接 -->
@@ -177,6 +189,10 @@ const message = useMessage()
 const formRef = ref<FormInst>()
 const loading = ref(false)
 const lineWrapEnabled = ref(true)
+// n-select 的搜索关键字
+const tagSearchQuery = ref('')
+// 以 __new__:name 的形式临时标记新标签，待保存时真正创建
+const NEW_TAG_PREFIX = '__new__:'
 
 // 表单数据
 const formData = ref<CreatePromptDTO & { id?: string }>({
@@ -190,11 +206,28 @@ const formData = ref<CreatePromptDTO & { id?: string }>({
 const isEditing = computed(() => props.prompt != null)
 
 const tagOptions = computed(() => {
-  return tagStore.tags.map(tag => ({
+  // 已有标签选项
+  const base = tagStore.tags.map(tag => ({
     label: tag.name,
     value: tag.id,
     disabled: false
   }))
+  // 将已选择但尚未创建的临时标签也展示出来
+  const tempNew = (formData.value.tags || [])
+    .filter(id => typeof id === 'string' && id.startsWith(NEW_TAG_PREFIX))
+    .map(id => ({
+      label: id.replace(NEW_TAG_PREFIX, ''),
+      value: id
+    }))
+  return [...base, ...tempNew]
+})
+
+// 是否需要展示“创建标签”操作项
+const showCreateAction = computed(() => {
+  const input = tagSearchQuery.value.trim()
+  if (!input) return false
+  // 判断是否已存在同名标签（忽略大小写）
+  return !tagStore.tags.some(t => t.name.toLowerCase() === input.toLowerCase())
 })
 
 
@@ -268,15 +301,50 @@ const toggleLineWrap = () => {
   // 暂时先切换状态，后续需要在 MarkdownEditor 中实现换行功能
 }
 
-const handleCreateTag = (label: string) => {
-  // 创建新标签的逻辑，返回一个选项对象
-  return {
-    label,
-    value: `new_tag_${Date.now()}`
-  }
+// 记录搜索关键字（用于展示“创建标签”操作项）
+const handleTagSearch = (query: string) => {
+  tagSearchQuery.value = query
+}
+
+// 点击“创建标签”操作：仅加入临时项
+const handleCreateFromInput = () => {
+  const name = tagSearchQuery.value.trim()
+  if (!name) return
+  const tempId = `${NEW_TAG_PREFIX}${name}`
+  formData.value.tags = Array.from(new Set([...(formData.value.tags || []), tempId]))
 }
 
 
+
+// 将临时标签在保存前批量落库，并返回真实的标签ID数组
+const realizeNewTags = async (ids: string[]): Promise<string[]> => {
+  const finalIds: string[] = []
+  const pendingCreateNames: string[] = []
+
+  for (const id of ids) {
+    if (typeof id === 'string' && id.startsWith(NEW_TAG_PREFIX)) {
+      const name = id.replace(NEW_TAG_PREFIX, '').trim()
+      if (!name) continue
+      const exist = tagStore.tags.find(t => t.name.toLowerCase() === name.toLowerCase())
+      if (exist) {
+        finalIds.push(exist.id)
+      } else {
+        pendingCreateNames.push(name)
+      }
+    } else if (id) {
+      finalIds.push(id)
+    }
+  }
+
+  for (const name of pendingCreateNames) {
+    const res = await tagStore.createTag({ name })
+    if (res.success && res.data) {
+      finalIds.push(res.data.id)
+    }
+  }
+
+  return Array.from(new Set(finalIds))
+}
 
 const handleSave = async () => {
   try {
@@ -314,7 +382,7 @@ const handleSave = async () => {
       const updateData: UpdatePromptDTO = {
         title: formData.value.title,
         content: formData.value.content,
-        tags: formData.value.tags,
+        tags: await realizeNewTags(formData.value.tags || []),
         source: formData.value.source
       }
       
@@ -333,7 +401,7 @@ const handleSave = async () => {
       const createData: CreatePromptDTO = {
         title: formData.value.title || '',
         content: formData.value.content,
-        tags: formData.value.tags,
+        tags: await realizeNewTags(formData.value.tags || []),
         source: formData.value.source
       }
       

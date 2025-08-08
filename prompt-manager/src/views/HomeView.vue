@@ -467,7 +467,6 @@ const cleanInvalidPrompts = async () => {
                   {{ getTagName(tagId) }}
                 </span>
               </div>
-              <span class="card-source" v-if="prompt.source">来源: {{ prompt.source }}</span>
             </div>
           </div>
         </div>
