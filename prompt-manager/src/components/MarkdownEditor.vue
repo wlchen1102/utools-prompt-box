@@ -308,19 +308,19 @@ defineExpose({
 
 /* Markdown 轻量高亮（浅色） */
 :global(.cm-content .md-h1) {
-  color: #1677ff;
+  color: #E6783A; /* 深一档，提高可读性 */
   font-weight: 700;
 }
 :global(.cm-content .md-h2) {
-  color: #0958d9;
+  color: #E6783A; /* 深一档 */
   font-weight: 700;
 }
 :global(.cm-content .md-h3) {
-  color: #1d39c4;
+  color: #E6783A; /* 深一档 */
   font-weight: 700;
 }
 :global(.cm-content .md-bold-wrap) {
-  color: #00B25A; /* 主题色：提高可读性 */
+  color: #E6783A; /* 深一档（含符号与内容） */
 }
 :global(.cm-content .md-bold) {
   font-weight: 800 !important;
@@ -331,19 +331,18 @@ defineExpose({
 }
 :global(.cm-content .md-strike) {
   text-decoration: line-through;
-  color: #595959;
 }
 :global(.cm-content .md-ulist) {
-  color: #13c2c2; /* 无序项目符号：青色 */
+  color: #E6783A; /* 列表标记统一色 */
   font-weight: 700;
 }
 :global(.cm-content .md-olist) {
-  color: #13c2c2; /* 有序项目编号：保持同色或按需更改 */
+  color: #E6783A; /* 列表标记统一色 */
   font-weight: 700;
 }
 :global(.cm-content .md-code) {
-  color: #d4380d;
-  background: #fff7e6;
+  color: #E6783A; /* 深一档 */
+  background: rgba(230, 120, 58, 0.12); /* 同色系浅底 */
   border-radius: 3px;
   padding: 0 2px;
 }
