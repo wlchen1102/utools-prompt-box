@@ -18,6 +18,7 @@ export type TagColor =
 // 标签基础接口
 export interface Tag {
   id: string                    // 唯一标识符
+  _rev?: string                 // uTools DB revision
   name: string                  // 标签名称（最多20个字符）
   color: TagColor              // 标签颜色
   description?: string         // 标签描述
@@ -25,6 +26,11 @@ export interface Tag {
   createdAt: string           // 创建时间 ISO字符串
   updatedAt: string           // 更新时间 ISO字符串
   isDeleted?: boolean         // 软删除标记
+}
+
+// 用于适配 uTools 文档对象的标签类型（包含 _id）
+export interface TagDBDoc extends Tag {
+  _id: string
 }
 
 // 创建标签的DTO

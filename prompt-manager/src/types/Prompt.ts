@@ -5,6 +5,7 @@
 // 提示词基础接口
 export interface Prompt {
   id: string                    // 唯一标识符
+  _rev?: string                 // uTools DB revision
   title: string                 // 提示词标题
   content: string               // 提示词内容（Markdown格式）
   tags: string[]               // 关联的标签ID数组
@@ -13,6 +14,11 @@ export interface Prompt {
   source?: string              // 来源说明
   createdAt: string            // 创建时间 ISO字符串
   updatedAt: string            // 更新时间 ISO字符串
+}
+
+// 用于适配 uTools 文档对象（包含 _id）
+export interface PromptDBDoc extends Prompt {
+  _id: string
 }
 
 // 创建提示词的DTO

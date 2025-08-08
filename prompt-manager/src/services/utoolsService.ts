@@ -3,13 +3,14 @@
  * 封装 uTools API 调用，提供类型安全的接口
  */
 
-import type { PreloadAPI, UtoolsDbDoc, FileFilter } from '@/types/utools'
+import type { PreloadAPI, UtoolsDbDoc, FileFilter, PluginEnterAction } from '@/types/utools'
 import type { Prompt } from '@/types/Prompt'
 
 class UtoolsService {
   private preload: PreloadAPI | null = null
 
   constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.preload = (window as any).preload || null
   }
 
@@ -54,8 +55,9 @@ class UtoolsService {
     if (!this.preload) return null
     
     try {
-      const doc = this.preload.db.get(`prompt_${id}`)
-      return doc?.data || null
+      const doc = this.preload.db.get(`prompt_${id}`) as UtoolsDbDoc | null
+      const prompt = doc?.data as Prompt | undefined
+      return prompt ?? null
     } catch (error) {
       console.error('获取提示词失败:', error)
       return null
@@ -81,7 +83,7 @@ class UtoolsService {
     
     try {
       const docs = this.preload.db.allDocs('prompt_')
-      return docs.map((doc: UtoolsDbDoc) => doc.data).filter(Boolean)
+      return docs.map((doc: UtoolsDbDoc) => doc.data as Prompt).filter(Boolean)
     } catch (error) {
       console.error('获取所有提示词失败:', error)
       return []
@@ -112,7 +114,7 @@ class UtoolsService {
     
     try {
       const docs = this.preload.db.allDocs('tag_')
-      return docs.map((doc: UtoolsDbDoc) => doc.data).filter(Boolean)
+      return docs.map((doc: UtoolsDbDoc) => doc.data as { id: string; name: string; color?: string }).filter(Boolean)
     } catch (error) {
       console.error('获取所有标签失败:', error)
       return []
@@ -245,7 +247,7 @@ class UtoolsService {
   /**
    * 插件生命周期
    */
-  onPluginEnter(callback: (action: any) => void): void {
+  onPluginEnter(callback: (action: PluginEnterAction) => void): void {
     this.preload?.onPluginEnter(callback)
   }
 

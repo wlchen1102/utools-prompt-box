@@ -119,7 +119,7 @@ export interface AppHistory {
   action: string                  // 操作类型
   target: string                  // 目标对象ID
   targetType: 'prompt' | 'tag' | 'config'
-  details: Record<string, any>    // 操作详情
+  details: Record<string, unknown>    // 操作详情
   timestamp: string
   userId?: string                 // 操作用户（未来扩展）
 }

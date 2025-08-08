@@ -13,8 +13,7 @@ import type {
   BatchPromptOperationResult,
   PromptStats
 } from '@/types/Prompt'
-import { UtoolsDB } from '@/utils/utoolsAPI'
-import { validatePrompt } from '@/utils/validators'
+import { UtoolsDB, type DBDoc } from '@/utils/utoolsAPI'
 
 export class PromptService {
   private db: UtoolsDB
@@ -32,17 +31,18 @@ export class PromptService {
       console.log('📖 从 uTools 数据库读取数据:', docs)
       
       const prompts = docs
-        .filter((doc: any) => doc && doc._id && doc._id.includes('prompt_')) // 只处理提示词数据
-        .map((doc: any) => ({
-          id: doc._id, // 直接使用完整的数据库ID，不再截取
-          title: doc.title || '',
-          content: doc.content || '',
-          tags: doc.tags || [],
-          source: doc.source || '',
-          usageCount: doc.usageCount || 0,
-          isFavorite: doc.isFavorite || false,
-          createdAt: doc.createdAt || new Date().toISOString(),
-          updatedAt: doc.updatedAt || new Date().toISOString()
+        .filter((doc: DBDoc) => doc && doc._id && doc._id.includes('prompt_')) // 只处理提示词数据
+        .map((doc: DBDoc) => ({
+          id: doc._id, // 直接使用完整的数据库ID
+          _rev: doc._rev,
+          title: doc.title as string || '',
+          content: doc.content as string || '',
+          tags: doc.tags as string[] || [],
+          source: doc.source as string || '',
+          usageCount: doc.usageCount as number || 0,
+          isFavorite: doc.isFavorite as boolean || false,
+          createdAt: doc.createdAt as string || new Date().toISOString(),
+          updatedAt: doc.updatedAt as string || new Date().toISOString()
         }))
         .filter((prompt: Prompt) => prompt.title && prompt.title.trim()) // 只过滤无效数据
         .sort((a: Prompt, b: Prompt) => 
@@ -64,28 +64,25 @@ export class PromptService {
     try {
       console.log('🔍 获取提示词，直接使用ID:', { id })
       
-      const doc = this.db.get(id)
+      const doc = this.db.get<DBDoc>(id)
       if (!doc) {
         return null
       }
 
-      // 确保 doc._id 存在
-      if (!doc._id) {
-        console.error(`提示词 ${id} 缺少 _id 字段:`, doc)
-        return null
+      const prompt: Prompt = {
+        id: doc._id,
+        _rev: doc._rev,
+        title: String((doc as unknown as Record<string, unknown>).title || ''),
+        content: String((doc as unknown as Record<string, unknown>).content || ''),
+        tags: (doc as unknown as Record<string, unknown>).tags as string[] || [],
+        source: String((doc as unknown as Record<string, unknown>).source || ''),
+        usageCount: Number((doc as unknown as Record<string, unknown>).usageCount || 0),
+        isFavorite: Boolean((doc as unknown as Record<string, unknown>).isFavorite || false),
+        createdAt: String((doc as unknown as Record<string, unknown>).createdAt || new Date().toISOString()),
+        updatedAt: String((doc as unknown as Record<string, unknown>).updatedAt || new Date().toISOString())
       }
 
-      return {
-        id: doc._id, // 直接使用完整ID
-        title: doc.title || '',
-        content: doc.content || '',
-        tags: doc.tags || [],
-        source: doc.source || '',
-        usageCount: doc.usageCount || 0,
-        isFavorite: doc.isFavorite || false,
-        createdAt: doc.createdAt || new Date().toISOString(),
-        updatedAt: doc.updatedAt || new Date().toISOString()
-      }
+      return prompt
     } catch (error) {
       console.error(`获取提示词 ${id} 失败:`, error)
       return null
@@ -125,7 +122,7 @@ export class PromptService {
       // 排序
       if (params.sortBy) {
         prompts.sort((a, b) => {
-          let aValue: any, bValue: any
+          let aValue: string | number, bValue: string | number
           
           switch (params.sortBy) {
             case 'title':
@@ -186,9 +183,10 @@ export class PromptService {
       // 生成ID
       const id = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const now = new Date().toISOString()
+      const fullId = `prompt_manager_prompt_${id}`
 
       const prompt: Prompt = {
-        id,
+        id: fullId,
         title: data.title,
         content: data.content,
         tags: data.tags || [],
@@ -226,13 +224,10 @@ export class PromptService {
       }
       
       console.log('准备保存的数据:', dataToSave)
-      const fullId = `prompt_manager_prompt_${id}`
       const result = this.db.put(fullId, dataToSave)
       
-      // 更新prompt对象的id为完整ID，以便返回给调用者
-      prompt.id = fullId
-
       if (result.ok) {
+        prompt._rev = result.rev
         console.log('提示词创建成功:', prompt)
         return {
           success: true,
@@ -262,7 +257,7 @@ export class PromptService {
       console.log('🔄 更新提示词，直接使用ID:', { id, data })
       
       // 直接使用完整ID获取文档
-      const doc = this.db.get(id)
+      const doc = this.db.get<DBDoc>(id)
       
       if (!doc) {
         return {
@@ -272,54 +267,56 @@ export class PromptService {
       }
 
       // 基础验证
-      if (!data.title?.trim()) {
+      if (data.title !== undefined && !data.title.trim()) {
         return {
           success: false,
           error: '提示词标题不能为空'
         }
       }
-      if (!data.content?.trim()) {
+      if (data.content !== undefined && !data.content.trim()) {
         return {
           success: false,
           error: '提示词内容不能为空'
         }
       }
 
-      // 更新数据
-      const updatedData = {
-        title: String(data.title || ''),
-        content: String(data.content || ''),
-        tags: Array.isArray(data.tags) ? data.tags.map((tag: any) => String(tag)) : (doc.tags || []),
-        source: String(data.source || ''),
-        usageCount: Number(data.usageCount || 0),
-        isFavorite: Boolean(data.isFavorite || false),
-        createdAt: String(doc.createdAt || new Date().toISOString()),
-        updatedAt: new Date().toISOString()
+      // 计算并“净化”可序列化的数据
+      const now = new Date().toISOString()
+      const dataToSave: Record<string, unknown> = {
+        title: String((data.title ?? (doc as any).title) || ''),
+        content: String((data.content ?? (doc as any).content) || ''),
+        tags: Array.isArray(data.tags)
+          ? (data.tags as unknown[]).map((t) => String(t))
+          : (Array.isArray((doc as any).tags) ? ((doc as any).tags as unknown[]).map((t: unknown) => String(t)) : []),
+        source: String((data.source ?? (doc as any).source) || ''),
+        usageCount: Number((data.usageCount ?? (doc as any).usageCount) || 0),
+        isFavorite: Boolean((data.isFavorite ?? (doc as any).isFavorite) || false),
+        createdAt: String((doc as any).createdAt || now),
+        updatedAt: now
       }
-      
-      console.log('🔄 更新提示词数据:', { id, updatedData })
-      
-      // 直接使用完整ID进行保存
-      const result = this.db.put(id, updatedData)
+
+      console.log('🔄 更新提示词数据(已净化):', { id, dataToSave })
+
+      // 保存
+      const result = this.db.put(id, dataToSave)
 
       if (result.ok) {
-        // 构建返回的提示词对象
-        const updated: Prompt = {
-          id: id, // 直接使用完整ID
-          title: updatedData.title,
-          content: updatedData.content,
-          tags: updatedData.tags,
-          source: updatedData.source,
-          usageCount: updatedData.usageCount || 0,
-          isFavorite: updatedData.isFavorite || false,
-          createdAt: updatedData.createdAt,
-          updatedAt: updatedData.updatedAt
+        const returned: Prompt = {
+          id,
+          _rev: result.rev,
+          title: dataToSave.title as string,
+          content: dataToSave.content as string,
+          tags: dataToSave.tags as string[],
+          source: dataToSave.source as string,
+          usageCount: dataToSave.usageCount as number,
+          isFavorite: dataToSave.isFavorite as boolean,
+          createdAt: dataToSave.createdAt as string,
+          updatedAt: dataToSave.updatedAt as string
         }
-        
-        console.log('提示词更新成功:', updated)
+        console.log('提示词更新成功:', returned)
         return {
           success: true,
-          data: updated,
+          data: returned,
           message: '提示词更新成功'
         }
       } else {
@@ -345,7 +342,7 @@ export class PromptService {
       console.log('🗑️ 开始删除提示词，直接使用ID:', id)
       
       // 直接使用完整ID获取文档
-      const doc = this.db.get(id)
+      const doc = this.db.get<DBDoc>(id)
       
       if (!doc) {
         console.log(`提示词 ${id} 在数据库中已不存在，无需删除。`)
@@ -538,7 +535,7 @@ export class PromptService {
       console.log('🧹 开始清理异常提示词数据...')
       
       const allDocs = this.db.allDocs()
-      const promptDocs = allDocs.filter(doc => doc && doc._id && doc._id.includes('prompt_'))
+      const promptDocs = allDocs.filter((doc): doc is DBDoc => !!(doc && (doc as unknown as { _id?: string })._id && (doc as unknown as { _id?: string })._id!.includes('prompt_')))
       
       console.log(`找到 ${promptDocs.length} 个提示词文档，检查异常数据...`)
       

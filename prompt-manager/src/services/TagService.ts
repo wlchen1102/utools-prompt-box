@@ -6,9 +6,10 @@ import type {
   TagSearchParams,
   TagStats,
   TagOperationResult,
-  TagDeleteResult
+  TagDeleteResult,
+  TagDBDoc
 } from '@/types/Tag'
-import { UtoolsDB } from '@/utils/utoolsAPI'
+import { UtoolsDB, type DBDoc } from '@/utils/utoolsAPI'
 
 /**
  * 标签服务类
@@ -40,9 +41,12 @@ export class TagService {
         }
       }
 
-      // 创建新标签
+      const id = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const fullId = `${TagService.TAG_STORE_KEY}_tag_${id}`
+
+      // 创建新标签（应用层模型）
       const newTag: Tag = {
-        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: fullId,
         name: data.name.trim(),
         color: data.color || 'primary',
         description: data.description?.trim(),
@@ -51,13 +55,21 @@ export class TagService {
         updatedAt: new Date().toISOString()
       }
 
-      // 保存到数据库
-      this.db.put(`${TagService.TAG_STORE_KEY}_tag_${newTag.id}`, newTag)
+      // 保存到数据库（底层会生成 _id）
+      const result = this.db.put(fullId, newTag as unknown as Record<string, unknown>)
 
-      return {
-        success: true,
-        data: newTag,
-        message: '标签创建成功'
+      if (result.ok) {
+        newTag._rev = result.rev
+        return {
+          success: true,
+          data: newTag,
+          message: '标签创建成功'
+        }
+      } else {
+        return {
+          success: false,
+          error: '数据库保存失败'
+        }
       }
     } catch (error) {
       console.error('创建标签失败:', error)
@@ -99,31 +111,29 @@ export class TagService {
       // 更新标签数据
       const updatedTag: Tag = {
         ...existingTag,
-        ...(data.name && { name: data.name.trim() }),
-        ...(data.color && { color: data.color }),
-        ...(data.description !== undefined && { description: data.description?.trim() }),
+        ...data,
+        name: data.name?.trim() || existingTag.name,
+        description: data.description?.trim(),
         updatedAt: new Date().toISOString()
       }
 
       // 保存到数据库 - 直接使用完整ID
       console.log('💾 准备保存更新的标签:', { id, updatedTag })
-      const saveResult = this.db.put(id, updatedTag)
+      const saveResult = this.db.put(id, updatedTag as unknown as Record<string, unknown>)
       console.log('💾 标签保存结果:', saveResult)
 
-      // 检查保存是否成功 - 需要处理 uTools 数据库可能返回的不同格式
-      const result = saveResult as any
-      if (result.error || !result.ok) {
-        console.error('💥 标签保存失败:', saveResult)
+      if (saveResult.ok) {
+        updatedTag._rev = saveResult.rev
+        return {
+          success: true,
+          data: updatedTag,
+          message: '标签更新成功'
+        }
+      } else {
         return {
           success: false,
-          error: result.message || '保存标签失败，可能存在版本冲突'
+          error: '保存标签失败，可能存在版本冲突'
         }
-      }
-
-      return {
-        success: true,
-        data: updatedTag,
-        message: '标签更新成功'
       }
     } catch (error) {
       console.error('更新标签失败:', error)
@@ -155,9 +165,9 @@ export class TagService {
       console.log('🗑️ 删除标签，直接使用ID:', { id })
       
       // 先获取完整文档，然后删除
-      const fullDoc = await this.db.get(id)
+      const fullDoc = await this.db.get<DBDoc>(id)
       if (fullDoc) {
-        await this.db.remove(fullDoc)
+        await this.db.remove(fullDoc as DBDoc)
         console.log('✅ 标签删除成功:', id)
       } else {
         console.log('⚠️ 标签文档不存在:', id)
@@ -193,7 +203,7 @@ export class TagService {
       console.log('🧹 开始清理所有标签数据...')
       
       const allTags = this.db.allDocs()
-      const tagDocs = allTags.filter(doc => doc && doc._id && doc._id.includes('tag_'))
+      const tagDocs = allTags.filter((doc): doc is DBDoc => !!doc && typeof (doc as any)._id === 'string' && (doc as any)._id.includes('tag_'))
       
       console.log(`找到 ${tagDocs.length} 个标签文档，准备删除...`)
       
@@ -236,7 +246,7 @@ export class TagService {
     try {
       console.log('🔍 获取标签，直接使用ID:', { id })
       
-      const tag = await this.db.get(id)
+      const tag = await this.db.get(id) as Tag | null
       return tag || null
     } catch (error) {
       console.error('获取标签失败:', error)
@@ -250,20 +260,20 @@ export class TagService {
   async getAllTags(): Promise<Tag[]> {
     try {
       // 直接调用同步的 allDocs 方法，过滤逻辑已在 utoolsAPI 层面处理
-      const allTags = this.db.allDocs('tag_')
+       const allTags = this.db.allDocs('tag_') as unknown as DBDoc[]
       console.log('从数据库获取的所有标签:', allTags)
       
       const tags = allTags
         // 进一步确保只处理标签数据
-        .filter(tag => tag && tag._id && tag._id.includes('tag_'))
-        .map(tag => ({
-          id: tag._id, // 直接使用完整的数据库ID，不再截取
-          name: tag.name || '',
-          color: tag.color || 'default',
-          description: tag.description || '',
-          promptCount: tag.promptCount || 0,
-          createdAt: tag.createdAt || new Date().toISOString(),
-          updatedAt: tag.updatedAt || new Date().toISOString(),
+        .filter(tag => tag && (tag as any)._id && (tag as any)._id.includes('tag_'))
+        .map((tag: DBDoc) => ({
+          id: String(tag._id),
+          name: String((tag as any).name || ''),
+          color: ((tag as any).color || 'default') as TagColor,
+          description: String((tag as any).description || ''),
+          promptCount: Number((tag as any).promptCount || 0),
+          createdAt: String((tag as any).createdAt || new Date().toISOString()),
+          updatedAt: String((tag as any).updatedAt || new Date().toISOString()),
           _rev: tag._rev
         }))
       
@@ -309,8 +319,8 @@ export class TagService {
       // 排序
       if (params.sortBy) {
         tags.sort((a, b) => {
-          let aValue: any = a[params.sortBy!]
-          let bValue: any = b[params.sortBy!]
+          let aValue: string | number = a[params.sortBy!]
+          let bValue: string | number = b[params.sortBy!]
 
           if (params.sortBy === 'createdAt' || params.sortBy === 'updatedAt') {
             aValue = new Date(aValue).getTime()
@@ -318,9 +328,9 @@ export class TagService {
           }
 
           if (params.sortOrder === 'desc') {
-            return bValue - aValue
+            return (bValue as number) - (aValue as number)
           } else {
-            return aValue - bValue
+            return (aValue as number) - (bValue as number)
           }
         })
       }

@@ -43,7 +43,7 @@ interface Emits {
   (e: 'cancel'): void
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   title: '确认操作',
   positiveText: '确认',
   negativeText: '取消'

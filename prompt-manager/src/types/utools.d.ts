@@ -7,7 +7,7 @@ declare global {
     nodeAPI: {
       fs: typeof import('fs')
       path: typeof import('path')
-      ipcRenderer: any
+      ipcRenderer: unknown
     }
     utools: UTools
   }
@@ -64,8 +64,8 @@ export interface PreloadAPI {
 export interface UtoolsDbDoc {
   _id: string
   _rev?: string
-  data?: any
-  [key: string]: any
+  data?: unknown
+  [key: string]: unknown
 }
 
 export interface FileFilter {
@@ -76,17 +76,17 @@ export interface FileFilter {
 export interface PluginEnterAction {
   code: string
   type: string
-  payload: any
+  payload: unknown
 }
 
 interface UTools {
   // 数据库操作
   db: {
-    put: (doc: { _id: string; [key: string]: any }) => { ok: boolean; id: string; rev: string }
-    get: (id: string) => any
+    put: (doc: { _id: string; [key: string]: unknown }) => { ok: boolean; id: string; rev: string }
+    get: (id: string) => unknown
     remove: (docOrId: string | { _id: string; _rev: string }) => { ok: boolean; id: string; rev: string }
-    bulkDocs: (docs: any[]) => any[]
-    allDocs: (key?: string) => any[]
+    bulkDocs: (docs: unknown[]) => { ok: boolean; id: string; rev: string }[]
+    allDocs: (key?: string) => { _id: string; _rev: string; [key: string]: unknown }[]
   }
 
   // 基础功能
@@ -106,12 +106,6 @@ interface UTools {
   onPluginEnter: (callback: (action: PluginEnterAction) => void) => void
   onPluginOut: (callback: () => void) => void
   onPluginDetach: (callback: () => void) => void
-}
-
-interface PluginEnterAction {
-  code: string
-  type: string
-  payload: any
 }
 
 export {} 

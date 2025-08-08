@@ -55,6 +55,7 @@
       <n-form-item path="content" class="form-item-clean">
         <div class="content-editor-container">
           <div class="editor-header">
+            <div class="editor-title">提示词</div>
             <div class="editor-spacer"></div>
             <div class="editor-right-controls">
               <span class="editor-language">Markdown</span>
@@ -147,8 +148,6 @@ import {
 
 import { useTagStore } from '@/stores/tagStore'
 import type { Prompt, CreatePromptDTO, UpdatePromptDTO } from '@/types/Prompt'
-import type { Tag, CreateTagDTO, UpdateTagDTO } from '@/types/Tag'
-import { validatePrompt } from '@/utils/validators'
 import { promptService } from '@/services/PromptService'
 import MarkdownEditor from './MarkdownEditor.vue'
 
@@ -489,7 +488,7 @@ tagStore.loadTags()
   border: 1px solid #e9ecef;
   border-radius: 6px;
   overflow: hidden;
-  min-height: 350px;
+  min-height: 175px;
   background: #f8f9fa;
 }
 
@@ -502,6 +501,12 @@ tagStore.loadTags()
   border-bottom: 1px solid #e9ecef;
   font-size: 12px;
   color: #6c757d;
+}
+
+.editor-title {
+  font-weight: 500;
+  color: #495057;
+  font-size: 14px;
 }
 
 .editor-spacer {
@@ -548,7 +553,7 @@ tagStore.loadTags()
   border: none !important;
   border-radius: 0 !important;
   height: 100%;
-  min-height: 300px;
+  min-height: 150px;
 }
 
 /* MarkdownEditor 在 PromptDialog 中的样式 */
@@ -558,14 +563,14 @@ tagStore.loadTags()
   background: transparent;
   font-size: 14px;
   height: 100%;
-  min-height: 300px;
+  min-height: 150px;
 }
 
 .content-editor :deep(.markdown-editor) {
   border: none !important;
   background: transparent !important;
   height: 100%;
-  min-height: 300px;
+  min-height: 150px;
 }
 
 .content-editor :deep(.cm-content) {
@@ -574,7 +579,7 @@ tagStore.loadTags()
   line-height: 1.5;
   background: var(--n-color-embedded-popover);
   padding: 12px;
-  min-height: 200px;
+  min-height: 100px;
 }
 
 .content-editor :deep(.cm-focused) {

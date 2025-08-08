@@ -4,20 +4,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
-import { basicSetup } from 'codemirror'
-import { EditorView } from '@codemirror/view'
-import { EditorState, Compartment } from '@codemirror/state'
-import { markdown } from '@codemirror/lang-markdown'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { placeholder } from '@codemirror/view'
+import { EditorView, placeholder as cmPlaceholder, lineNumbers } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+
 
 interface Props {
   modelValue: string
   placeholder?: string
   disabled?: boolean
   readonly?: boolean
-  theme?: 'light' | 'dark'
-  lineWrap?: boolean
 }
 
 interface Emits {
@@ -30,28 +25,24 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   placeholder: '请输入提示词内容（支持 Markdown 格式）',
   disabled: false,
-  readonly: false,
-  theme: 'light',
-  lineWrap: true
+  readonly: false
 })
 
 const emit = defineEmits<Emits>()
 
 const editorContainer = ref<HTMLElement>()
 let editorView: EditorView | null = null
-// 用于管理只读状态的 Compartment
-const readOnlyCompartment = new Compartment()
+
+
 
 // 创建编辑器状态
 const createEditorState = (content: string) => {
   const extensions = [
-    basicSetup,
-    markdown(),
-    placeholder(props.placeholder),
-    // 根据 lineWrap 属性决定是否启用换行
-    ...(props.lineWrap ? [EditorView.lineWrapping] : []),
-    // 添加只读状态管理
-    readOnlyCompartment.of(EditorState.readOnly.of(props.readonly || props.disabled)),
+    lineNumbers(),
+    EditorView.lineWrapping,
+    cmPlaceholder(props.placeholder),
+    // 设置只读状态（如果需要）
+    ...(props.readonly || props.disabled ? [EditorState.readOnly.of(true)] : []),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newValue = update.state.doc.toString()
@@ -69,105 +60,24 @@ const createEditorState = (content: string) => {
       }
     }),
     EditorView.theme({
-      '&': {
-        fontSize: '14px',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        height: '100%'
-      },
       '.cm-content': {
         padding: '16px',
-        minHeight: '300px',
+        minHeight: '150px',
         lineHeight: '1.6',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        backgroundColor: '#f8f9fa',
-        border: '1px solid #e9ecef',
-        borderRadius: '6px'
+        backgroundColor: '#ffffff'
+      },
+      '.cm-scroller': {
+        minHeight: '150px'
       },
       '.cm-focused': {
         outline: 'none'
       },
       '.cm-editor': {
-        border: 'none',
-        borderRadius: '0',
-        backgroundColor: 'transparent',
-        height: '100%'
-      },
-      '.cm-editor.cm-focused': {
-        outline: 'none'
-      },
-      '.cm-scroller': {
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        height: '100%',
-        backgroundColor: '#f8f9fa'
-      },
-      '.cm-gutters': {
-        backgroundColor: '#f8f9fa',
-        border: 'none'
-      },
-      '.cm-lineNumbers': {
-        backgroundColor: '#f8f9fa'
-      },
-      '.cm-lineNumbers .cm-gutterElement': {
-        color: '#9ca3af',
-        fontSize: '12px'
-      },
-      '.cm-activeLineGutter': {
-        backgroundColor: 'rgba(0, 178, 90, 0.05)',
-        color: 'var(--primary-color)',
-        fontWeight: '500'
-      },
-      // Markdown 语法高亮样式
-      '.cm-header': {
-        color: 'var(--primary-color)',
-        fontWeight: 'bold'
-      },
-      '.cm-strong': {
-        fontWeight: 'bold',
-        color: 'var(--text-color)'
-      },
-      '.cm-emphasis': {
-        fontStyle: 'italic',
-        color: 'var(--text-color)'
-      },
-      '.cm-strikethrough': {
-        textDecoration: 'line-through'
-      },
-      '.cm-link': {
-        color: 'var(--primary-color)',
-        textDecoration: 'underline'
-      },
-      '.cm-monospace': {
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        padding: '1px 3px',
-        borderRadius: '3px',
-        fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
-      },
-      '.cm-list': {
-        color: 'var(--primary-color)'
-      },
-      '.cm-quote': {
-        color: '#6b7280',
-        fontStyle: 'italic',
-        borderLeft: '3px solid var(--primary-color)',
-        paddingLeft: '8px'
-      },
-      // 光标和选择相关样式
-      '.cm-cursor, .cm-dropCursor': {
-        borderLeftColor: 'var(--primary-color)'
-      },
-      '.cm-selectionBackground': {
-        backgroundColor: 'rgba(0, 178, 90, 0.2)'
-      },
-      '.cm-focused .cm-selectionBackground': {
-        backgroundColor: 'rgba(0, 178, 90, 0.25)'
+        border: '1px solid #e9ecef',
+        borderRadius: '6px'
       }
     })
   ]
-
-  // 如果是暗色主题，添加暗色主题扩展
-  if (props.theme === 'dark') {
-    extensions.push(oneDark)
-  }
 
   return EditorState.create({
     doc: content,
@@ -210,34 +120,13 @@ watch(() => props.modelValue, (newValue) => {
   updateContent(newValue)
 })
 
-// 监听主题变化
-watch(() => props.theme, async () => {
-  if (editorView) {
-    // 销毁旧编辑器
-    editorView.destroy()
-    // 重新创建编辑器
-    await nextTick()
-    initEditor()
-  }
-})
-
-// 监听换行设置变化
-watch(() => props.lineWrap, async () => {
-  if (editorView) {
-    // 销毁旧编辑器
-    editorView.destroy()
-    // 重新创建编辑器
-    await nextTick()
-    initEditor()
-  }
-})
-
 // 监听只读状态变化
-watch(() => [props.readonly, props.disabled], ([readonly, disabled]) => {
+watch(() => [props.readonly, props.disabled], async () => {
   if (editorView) {
-    editorView.dispatch({
-      effects: [readOnlyCompartment.reconfigure(EditorState.readOnly.of(readonly || disabled))]
-    })
+    // 重新创建编辑器以更新只读状态
+    editorView.destroy()
+    await nextTick()
+    initEditor()
   }
 })
 
@@ -260,7 +149,7 @@ defineExpose({
 <style scoped>
 .markdown-editor {
   width: 100%;
-  min-height: 300px;
+  min-height: 150px;
   height: 100%;
   border: 1px solid #e9ecef;
   border-radius: 6px;

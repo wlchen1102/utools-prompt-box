@@ -51,7 +51,7 @@ export class ValidationUtils {
   }
 
   // 检查是否为空
-  static validateRequired(value: any, field: string): string[] {
+  static validateRequired(value: unknown, field: string): string[] {
     const errors: string[] = []
     
     if (value === null || value === undefined || value === '') {
@@ -81,7 +81,7 @@ export class ValidationUtils {
 
   // 检查数组长度
   static validateArrayLength(
-    value: any[],
+    value: unknown[],
     field: string,
     min: number = 0,
     max: number = Number.MAX_SAFE_INTEGER
