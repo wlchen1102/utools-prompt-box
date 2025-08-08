@@ -110,7 +110,9 @@
       <!-- 标签选择 -->
       <n-form-item path="tags" class="form-item-clean">
         <n-select
+          :key="selectRerenderKey"
           v-model:value="formData.tags"
+          v-model:show="tagDropdownShow"
           multiple
           :options="tagOptions"
           placeholder="添加标签"
@@ -193,6 +195,10 @@ const lineWrapEnabled = ref(true)
 const tagSearchQuery = ref('')
 // 以 __new__:name 的形式临时标记新标签，待保存时真正创建
 const NEW_TAG_PREFIX = '__new__:'
+// 控制下拉显隐，用于点创建后关闭下拉
+const tagDropdownShow = ref(false)
+// 用于强制重渲染 n-select，解决下拉不收起与输入未清空的问题
+const selectRerenderKey = ref(0)
 
 // 表单数据
 const formData = ref<CreatePromptDTO & { id?: string }>({
@@ -306,12 +312,25 @@ const handleTagSearch = (query: string) => {
   tagSearchQuery.value = query
 }
 
+// 当多选值变化时，若包含临时标签，清理输入并收起下拉
+watch(() => formData.value.tags, (newVal) => {
+  if ((newVal || []).some(id => typeof id === 'string' && id.startsWith(NEW_TAG_PREFIX))) {
+    tagSearchQuery.value = ''
+    tagDropdownShow.value = false
+  }
+}, { deep: true })
+
 // 点击“创建标签”操作：仅加入临时项
 const handleCreateFromInput = () => {
   const name = tagSearchQuery.value.trim()
   if (!name) return
   const tempId = `${NEW_TAG_PREFIX}${name}`
   formData.value.tags = Array.from(new Set([...(formData.value.tags || []), tempId]))
+  // 清空输入 & 关闭下拉，避免重复创建
+  tagSearchQuery.value = ''
+  tagDropdownShow.value = false
+  // 强制重渲染 select，保证 UI 状态同步
+  selectRerenderKey.value++
 }
 
 

@@ -40,7 +40,8 @@ export const useTagStore = defineStore('tag', () => {
       const loadedTags = await tagService.getAllTags()
       console.log('📊 从数据库加载的标签:', loadedTags)
       
-      tags.value = loadedTags
+      // 过滤掉名称为空的脏标签
+      tags.value = loadedTags.filter(t => t && t.name && t.name.trim() !== '')
       isLoaded.value = true
       
       console.log('✅ Store 中的标签已更新为:', tags.value.map(t => ({ id: t.id, name: t.name })))

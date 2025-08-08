@@ -93,7 +93,9 @@ const getTagColor = (tagId: string) => {
 }
 
 const getContentPreview = (content: string) => {
-  return content.length > 100 ? content.substring(0, 100) + '...' : content
+  const text = (content || '').trim()
+  if (!text) return ''
+  return text.length > 100 ? text.substring(0, 100) + '...' : text
 }
 
 // 搜索相关方法
@@ -425,7 +427,7 @@ const cleanInvalidPrompts = async () => {
         <!-- 提示词卡片网格 -->
         <div v-else class="card-grid">
           <div 
-            v-for="prompt in filteredPrompts" 
+            v-for="prompt in filteredPrompts.filter(p => (p.content || '').trim())" 
             :key="prompt.id"
             class="prompt-card"
           >

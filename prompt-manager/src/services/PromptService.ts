@@ -31,13 +31,24 @@ export class PromptService {
       console.log('📖 从 uTools 数据库读取数据:', docs)
       
       const prompts = docs
-        .filter((doc: DBDoc) => doc && doc._id && doc._id.includes('prompt_')) // 只处理提示词数据
+        // 只处理提示词数据并排除内容为空的脏数据
+        .filter((doc: DBDoc) => {
+          const isPrompt = !!(doc && doc._id && doc._id.includes('prompt_'))
+          const content = (doc as any)?.content
+          const hasContent = typeof content === 'string' && content.trim().length > 0
+          return isPrompt && hasContent
+        })
         .map((doc: DBDoc) => ({
           id: doc._id, // 直接使用完整的数据库ID
           _rev: doc._rev,
           title: doc.title as string || '',
           content: doc.content as string || '',
-          tags: doc.tags as string[] || [],
+          // 过滤无效标签ID，避免出现空字符串/undefined
+          tags: (Array.isArray((doc as any).tags)
+            ? ((doc as any).tags as unknown[])
+                .map((t) => String(t))
+                .filter((t) => t && t.trim() !== '')
+            : []),
           source: doc.source as string || '',
           usageCount: doc.usageCount as number || 0,
           isFavorite: doc.isFavorite as boolean || false,
