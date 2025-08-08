@@ -430,22 +430,24 @@ const cleanInvalidPrompts = async () => {
             v-for="prompt in filteredPrompts.filter(p => (p.content || '').trim())" 
             :key="prompt.id"
             class="prompt-card"
+            @dblclick="editPrompt(prompt)"
+            title="双击编辑"
           >
             <div class="card-header">
                 <h4 class="card-title">{{ prompt.title || '' }}</h4>
               <div class="card-actions">
-                <button class="card-btn" @click="copyPrompt(prompt)" title="复制">
+                <button class="card-btn" @click.stop="copyPrompt(prompt)" @dblclick.stop title="复制">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                   </svg>
                 </button>
-                <button class="card-btn" @click="editPrompt(prompt)" title="编辑">
+                <button class="card-btn" @click.stop="editPrompt(prompt)" @dblclick.stop title="编辑">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                   </svg>
                 </button>
-                <button class="card-btn delete" @click="deletePrompt(prompt)" title="删除">
+                <button class="card-btn delete" @click.stop="deletePrompt(prompt)" @dblclick.stop title="删除">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <polyline points="3,6 5,6 21,6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -691,6 +693,14 @@ const cleanInvalidPrompts = async () => {
 .prompt-card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   transform: translateY(-2px);
+}
+
+/* 双击编辑的指针与提示 */
+.prompt-card {
+  cursor: default;
+}
+.prompt-card[title] {
+  cursor: pointer;
 }
 
 .card-header {
