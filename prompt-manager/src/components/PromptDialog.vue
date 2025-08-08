@@ -42,7 +42,7 @@
       <n-form-item path="title" class="form-item-clean">
         <n-input
           v-model:value="formData.title"
-          placeholder="提示词标题"
+          placeholder="请输入标题"
           maxlength="100"
           show-count
           :disabled="loading"
@@ -113,7 +113,7 @@
           v-model:value="formData.tags"
           multiple
           :options="tagOptions"
-          placeholder="标签（全局功能关键字）"
+          placeholder="添加标签"
           :disabled="loading"
           clearable
           filterable
@@ -127,7 +127,7 @@
       <n-form-item path="source" class="form-item-clean">
         <n-input
           v-model:value="formData.source"
-          placeholder="备注说明"
+          placeholder="添加备注"
           :disabled="loading"
           size="large"
         />

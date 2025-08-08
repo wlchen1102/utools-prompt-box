@@ -57,12 +57,36 @@ const createEditorState = (content: string) => {
       const addMark = (from: number, to: number, className: string) => {
         decos.push(Decoration.mark({ class: className }).range(from, to))
       }
+      // 预扫描 ``` 代码块范围，代码块内不做 Markdown 高亮
+      const fenceRanges: Array<{ from: number; to: number }> = []
+      let inFence = false
+      let fenceStart = 0
+      for (let i = 1; i <= doc.lines; i++) {
+        const ln = doc.line(i)
+        const txt = ln.text.trim()
+        if (txt.startsWith('```')) {
+          if (!inFence) {
+            inFence = true
+            fenceStart = ln.from
+          } else {
+            inFence = false
+            fenceRanges.push({ from: fenceStart, to: ln.to })
+          }
+        }
+      }
+      const isInFence = (from: number, to: number) =>
+        fenceRanges.some(r => !(to < r.from || from > r.to))
       // 遍历可见区域的每一行，做基于正则的轻量标注
       for (const { from, to } of view.visibleRanges) {
         let line = doc.lineAt(from)
         while (line.from <= to) {
           const text = line.text
           const base = line.from
+          if (isInFence(line.from, line.to)) {
+            if (line.to >= to) break
+            line = doc.line(line.number + 1)
+            continue
+          }
           // 标题：开头 #、##、###
           const mHeading = /^(#{1,6})\s+.+/.exec(text)
           if (mHeading) {
@@ -104,6 +128,16 @@ const createEditorState = (content: string) => {
           for (const r of text.matchAll(/`([^`]+)`/g)) {
             const s = base + (r.index ?? 0)
             addMark(s, s + r[0].length, 'md-code')
+          }
+          // 链接 [text](url)
+          for (const r of text.matchAll(/\[[^\]]*\]\([^\)]+\)/g)) {
+            const s = base + (r.index ?? 0)
+            addMark(s, s + r[0].length, 'md-link')
+          }
+          // 图片 ![alt](url)
+          for (const r of text.matchAll(/!\[[^\]]*\]\([^\)]+\)/g)) {
+            const s = base + (r.index ?? 0)
+            addMark(s, s + r[0].length, 'md-image')
           }
           if (line.to >= to) break
           line = doc.line(line.number + 1)
@@ -257,6 +291,7 @@ defineExpose({
 :global(.cm-placeholder) {
   color: #6c757d;
   font-style: italic;
+  font-size: 14px; /* 与其他占位文本保持一致 */
 }
 
 /* 选中文本样式 */
@@ -341,9 +376,15 @@ defineExpose({
   font-weight: 700;
 }
 :global(.cm-content .md-code) {
-  color: #E6783A; /* 深一档 */
-  background: rgba(230, 120, 58, 0.12); /* 同色系浅底 */
-  border-radius: 3px;
-  padding: 0 2px;
+  color: #E6783A; /* 深一档，仅文字颜色 */
+}
+
+:global(.cm-content .md-link) {
+  color: #E6783A; /* 与正文强调同色 */
+  text-decoration: underline;
+}
+
+:global(.cm-content .md-image) {
+  color: #E6783A; /* 仅文字颜色 */
 }
 </style>
