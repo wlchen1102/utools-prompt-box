@@ -4,8 +4,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
-import { EditorView, placeholder as cmPlaceholder, lineNumbers } from '@codemirror/view'
+import { EditorView, placeholder as cmPlaceholder, lineNumbers, Decoration, ViewPlugin, ViewUpdate } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
+import { markdown } from '@codemirror/lang-markdown'
 
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
   placeholder?: string
   disabled?: boolean
   readonly?: boolean
+  lineWrap?: boolean
 }
 
 interface Emits {
@@ -25,7 +27,8 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   placeholder: '请输入提示词内容（支持 Markdown 格式）',
   disabled: false,
-  readonly: false
+  readonly: false,
+  lineWrap: true
 })
 
 const emit = defineEmits<Emits>()
@@ -37,10 +40,85 @@ let editorView: EditorView | null = null
 
 // 创建编辑器状态
 const createEditorState = (content: string) => {
+  // 轻量级 Markdown 装饰插件（不依赖 HighlightStyle，避免 uTools 环境崩溃）
+  const mdLightDecorator = ViewPlugin.fromClass(class {
+    decorations: ReturnType<typeof Decoration.set>
+    constructor(view: EditorView) {
+      this.decorations = this.build(view)
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = this.build(update.view)
+      }
+    }
+    build(view: EditorView) {
+      const decos: any[] = []
+      const doc = view.state.doc
+      const addMark = (from: number, to: number, className: string) => {
+        decos.push(Decoration.mark({ class: className }).range(from, to))
+      }
+      // 遍历可见区域的每一行，做基于正则的轻量标注
+      for (const { from, to } of view.visibleRanges) {
+        let line = doc.lineAt(from)
+        while (line.from <= to) {
+          const text = line.text
+          const base = line.from
+          // 标题：开头 #、##、###
+          const mHeading = /^(#{1,6})\s+.+/.exec(text)
+          if (mHeading) {
+            const level = mHeading[1].length
+            addMark(base, line.to, level === 1 ? 'md-h1' : level === 2 ? 'md-h2' : 'md-h3')
+          }
+          // 列表项标记
+          const bullet = /^\s*([*+-]|\d+\.)\s+/.exec(text)
+          if (bullet) {
+            const marker = bullet[1]
+            // 只标注符号或序号本体
+            const markerStart = base + bullet[0].indexOf(marker)
+            addMark(markerStart, markerStart + marker.length, marker.match(/^\d+\.$/) ? 'md-olist' : 'md-ulist')
+          }
+          // 行内：粗体 **text** 或 __text__
+          for (const r of text.matchAll(/\*\*([^*]+)\*\*|__([^_]+)__/g)) {
+            // 外层（含 ** 或 __）用于背景着色
+            const wrapStart = base + (r.index ?? 0)
+            const wrapEnd = wrapStart + r[0].length
+            addMark(wrapStart, wrapEnd, 'md-bold-wrap')
+
+            // 内部文字加更强的字重
+            const innerStart = wrapStart + 2
+            const innerLen = Math.max(0, r[0].length - 4)
+            if (innerLen > 0) addMark(innerStart, innerStart + innerLen, 'md-bold')
+          }
+          // 斜体 *text* 或 _text_ （仅高亮内部文字）
+          for (const r of text.matchAll(/(?<!\*)\*([^*]+)\*(?!\*)|(?<!_)_([^_]+)_(?!_)/g)) {
+            const start = base + (r.index ?? 0) + 1
+            const len = Math.max(0, r[0].length - 2)
+            if (len > 0) addMark(start, start + len, 'md-italic')
+          }
+          // 删除线 ~~text~~
+          for (const r of text.matchAll(/~~([^~]+)~~/g)) {
+            const s = base + (r.index ?? 0)
+            addMark(s, s + r[0].length, 'md-strike')
+          }
+          // 行内代码 `code`
+          for (const r of text.matchAll(/`([^`]+)`/g)) {
+            const s = base + (r.index ?? 0)
+            addMark(s, s + r[0].length, 'md-code')
+          }
+          if (line.to >= to) break
+          line = doc.line(line.number + 1)
+        }
+      }
+      return Decoration.set(decos, true)
+    }
+  }, { decorations: v => v.decorations })
+
   const extensions = [
     lineNumbers(),
-    EditorView.lineWrapping,
+    ...(props.lineWrap ? [EditorView.lineWrapping] : []),
     cmPlaceholder(props.placeholder),
+    markdown(),
+    mdLightDecorator,
     // 设置只读状态（如果需要）
     ...(props.readonly || props.disabled ? [EditorState.readOnly.of(true)] : []),
     EditorView.updateListener.of((update) => {
@@ -120,8 +198,8 @@ watch(() => props.modelValue, (newValue) => {
   updateContent(newValue)
 })
 
-// 监听只读状态变化
-watch(() => [props.readonly, props.disabled], async () => {
+// 监听只读/禁用/换行设置变化
+watch(() => [props.readonly, props.disabled, props.lineWrap], async () => {
   if (editorView) {
     // 重新创建编辑器以更新只读状态
     editorView.destroy()
@@ -226,5 +304,47 @@ defineExpose({
 
 :global(.cm-searchMatch.cm-searchMatch-selected) {
   background-color: rgba(255, 213, 79, 0.8);
+}
+
+/* Markdown 轻量高亮（浅色） */
+:global(.cm-content .md-h1) {
+  color: #1677ff;
+  font-weight: 700;
+}
+:global(.cm-content .md-h2) {
+  color: #0958d9;
+  font-weight: 700;
+}
+:global(.cm-content .md-h3) {
+  color: #1d39c4;
+  font-weight: 700;
+}
+:global(.cm-content .md-bold-wrap) {
+  color: #00B25A; /* 主题色：提高可读性 */
+}
+:global(.cm-content .md-bold) {
+  font-weight: 800 !important;
+  color: currentColor !important; /* 继承外层颜色，强化字重 */
+}
+:global(.cm-content .md-italic) {
+  font-style: italic;
+}
+:global(.cm-content .md-strike) {
+  text-decoration: line-through;
+  color: #595959;
+}
+:global(.cm-content .md-ulist) {
+  color: #13c2c2; /* 无序项目符号：青色 */
+  font-weight: 700;
+}
+:global(.cm-content .md-olist) {
+  color: #13c2c2; /* 有序项目编号：保持同色或按需更改 */
+  font-weight: 700;
+}
+:global(.cm-content .md-code) {
+  color: #d4380d;
+  background: #fff7e6;
+  border-radius: 3px;
+  padding: 0 2px;
 }
 </style>
