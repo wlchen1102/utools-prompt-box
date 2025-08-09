@@ -267,7 +267,8 @@ export class TagService {
         // 进一步确保只处理标签数据
         .filter(tag => tag && (tag as any)._id && (tag as any)._id.includes('tag_'))
         .map((tag: DBDoc) => ({
-          id: String(tag._id),
+          // 业务层使用去前缀的 ID（不包含 prompt_manager_），与提示词中保存的标签ID保持一致
+          id: String(tag._id).replace(/^prompt_manager_/, ''),
           name: String((tag as any).name || ''),
           color: ((tag as any).color || 'default') as TagColor,
           description: String((tag as any).description || ''),
@@ -279,8 +280,10 @@ export class TagService {
       
       console.log('映射后的标签:', tags)
 
-      // 按创建时间倒序排序
-      const sortedTags = tags.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // 按创建时间倒序排序并去重（按 id）
+      const sortedTags = tags
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .filter((tag, index, self) => self.findIndex(t => t.id === tag.id) === index)
       console.log('排序后的标签:', sortedTags)
       
       return sortedTags

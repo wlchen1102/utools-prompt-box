@@ -40,8 +40,14 @@ export const useTagStore = defineStore('tag', () => {
       const loadedTags = await tagService.getAllTags()
       console.log('📊 从数据库加载的标签:', loadedTags)
       
-      // 过滤掉名称为空的脏标签
-      tags.value = loadedTags.filter(t => t && t.name && t.name.trim() !== '')
+      // 过滤掉名称为空的脏标签，并按名称忽略大小写去重
+      const uniqueByName = new Map<string, Tag>()
+      loadedTags.forEach(t => {
+        if (!t || !t.name || !t.name.trim()) return
+        const key = t.name.trim().toLowerCase()
+        if (!uniqueByName.has(key)) uniqueByName.set(key, t)
+      })
+      tags.value = Array.from(uniqueByName.values())
       isLoaded.value = true
       
       console.log('✅ Store 中的标签已更新为:', tags.value.map(t => ({ id: t.id, name: t.name })))

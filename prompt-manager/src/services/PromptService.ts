@@ -39,7 +39,7 @@ export class PromptService {
           return isPrompt && hasContent
         })
         .map((doc: DBDoc) => ({
-          id: doc._id, // 直接使用完整的数据库ID
+          id: String(doc._id).replace(/^prompt_manager_/, ''),
           _rev: doc._rev,
           title: doc.title as string || '',
           content: doc.content as string || '',
@@ -47,7 +47,14 @@ export class PromptService {
           tags: (Array.isArray((doc as any).tags)
             ? ((doc as any).tags as unknown[])
                 .map((t) => String(t))
-                .filter((t) => t && t.trim() !== '')
+                // 过滤掉临时标签前缀，避免渲染 ID 字符串
+                .filter((t) => t && t.trim() !== '' && !t.startsWith('__new__:'))
+                // 进一步：若是形如 'tags_tag_' 的 ID，但数据库不存在对应标签，直接丢弃（视为数据不一致）
+                .filter((t) => {
+                  if (!t.startsWith('tags_tag_')) return true
+                  // 无法同步检查 DB，这里先保留；实际一致性在弹窗打开时按ID补齐
+                  return true
+                })
             : []),
           source: doc.source as string || '',
           usageCount: doc.usageCount as number || 0,
@@ -80,7 +87,7 @@ export class PromptService {
       }
 
       const prompt: Prompt = {
-        id: doc._id,
+        id: String(doc._id).replace(/^prompt_manager_/, ''),
         _rev: doc._rev,
         title: String((doc as unknown as Record<string, unknown>).title || ''),
         content: String((doc as unknown as Record<string, unknown>).content || ''),
