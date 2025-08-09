@@ -194,13 +194,16 @@ const loading = ref(false)
 const lineWrapEnabled = ref(true)
 // n-select 的搜索关键字
 const tagSearchQuery = ref('')
+// 临时标签前缀（仅会话内使用，保存时才真正落库）
+const TEMP_TAG_PREFIX = '__temp__:'
 // 控制下拉显隐，用于点创建后关闭下拉
 const tagDropdownShow = ref(false)
 // 用于强制重渲染 n-select，解决下拉不收起与输入未清空的问题
 const selectRerenderKey = ref(0)
 
 // 表单数据
-const formData = ref<CreatePromptDTO & { id?: string }>({
+// 统一标签选中模型：字符串形式存储，已有标签为真实ID；临时标签为 __temp__:name
+const formData = ref<CreatePromptDTO & { id?: string; tags: string[] }>({
   title: '',
   content: '',
   tags: [],
@@ -225,7 +228,12 @@ const tagOptions = computed(() => {
     value: tag.id,
     disabled: false
   }))
-  return base
+  // 将会话内的临时标签补充到下拉（只用于回显，不在 store）
+  const tempOptions = (formData.value.tags || [])
+    .filter(id => typeof id === 'string' && id.startsWith(TEMP_TAG_PREFIX))
+    .map(id => ({ label: id.replace(TEMP_TAG_PREFIX, ''), value: id, disabled: false }))
+
+  return [...base, ...tempOptions]
 })
 // 自定义渲染已选标签，确保显示名称而不是ID
 const renderSelectedTag = ({ option, handleClose }: any) => {
@@ -234,13 +242,16 @@ const renderSelectedTag = ({ option, handleClose }: any) => {
   let displayName = labelFromOption
 
   // 若是已有标签ID，尝试从 store 查名字
-  if (value) {
-    const found = tagStore.tags.find(t => t.id === value)
-    if (found) displayName = found.name
-    // 兜底：若还未找到，回显为 ID 的后缀，避免整串 ID
-    if (!found && typeof value === 'string') {
-      const suffix = value.split('_').slice(-1)[0]
-      displayName = labelFromOption || suffix || value
+  if (typeof value === 'string') {
+    if (value.startsWith(TEMP_TAG_PREFIX)) {
+      displayName = value.replace(TEMP_TAG_PREFIX, '')
+    } else {
+      const found = tagStore.tags.find(t => t.id === value)
+      if (found) displayName = found.name
+      if (!found) {
+        const suffix = value.split('_').slice(-1)[0]
+        displayName = labelFromOption || suffix || value
+      }
     }
   }
 
@@ -349,14 +360,12 @@ const handleCreateFromInput = async () => {
   if (!name) return
   const existing = tagStore.tags.find(t => t.name.trim().toLowerCase() === name.toLowerCase())
   if (existing) {
+    // 已存在的直接选中真实ID
     formData.value.tags = Array.from(new Set([...(formData.value.tags || []), existing.id]))
   } else {
-    const res = await tagStore.createTag({ name })
-    if (res.success && res.data) {
-      formData.value.tags = Array.from(new Set([...(formData.value.tags || []), res.data.id]))
-    } else {
-      message.error(res.error || '创建标签失败')
-    }
+    // 仅加入临时标签，占位到提交时再真正创建
+    const tempId = `${TEMP_TAG_PREFIX}${name}`
+    formData.value.tags = Array.from(new Set([...(formData.value.tags || []), tempId]))
   }
   // 清空输入 & 关闭下拉，避免重复创建
   tagSearchQuery.value = ''
@@ -367,7 +376,31 @@ const handleCreateFromInput = async () => {
 
 
 
-// 已不再使用“临时标签”路径，上述辅助函数已移除
+// 提交时将选择的标签（真实ID + 临时）转化为真实ID：
+// - 对真实ID：直接返回
+// - 对临时：先查重（忽略大小写），存在返回其ID；不存在创建后返回ID
+const realizeOnSubmit = async (selected: string[]): Promise<string[]> => {
+  const resultIds: string[] = []
+  for (const v of selected) {
+    if (typeof v !== 'string') continue
+    if (!v.startsWith(TEMP_TAG_PREFIX)) {
+      resultIds.push(v)
+      continue
+    }
+    const name = v.replace(TEMP_TAG_PREFIX, '').trim()
+    if (!name) continue
+    const existing = tagStore.tags.find(t => t.name.trim().toLowerCase() === name.toLowerCase())
+    if (existing) {
+      resultIds.push(existing.id)
+    } else {
+      const res = await tagStore.createTag({ name })
+      if (res.success && res.data) {
+        resultIds.push(res.data.id)
+      }
+    }
+  }
+  return Array.from(new Set(resultIds))
+}
 
 const handleSave = async () => {
   try {
@@ -405,7 +438,7 @@ const handleSave = async () => {
       const updateData: UpdatePromptDTO = {
         title: formData.value.title,
         content: formData.value.content,
-        tags: (formData.value.tags || []).map(id => id.replace(/^prompt_manager_/, '')),
+        tags: await realizeOnSubmit(formData.value.tags || []),
         source: formData.value.source
       }
       
@@ -424,7 +457,7 @@ const handleSave = async () => {
       const createData: CreatePromptDTO = {
         title: formData.value.title || '',
         content: formData.value.content,
-        tags: (formData.value.tags || []).map(id => id.replace(/^prompt_manager_/, '')),
+        tags: await realizeOnSubmit(formData.value.tags || []),
         source: formData.value.source
       }
       
